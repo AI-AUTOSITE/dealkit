@@ -15,7 +15,6 @@ import { useTheme, spacing, borderRadius, fontSize, shadows } from '../../../lib
 import { useInvoices } from '@/lib/hooks';
 import { Invoice } from '@/types';
 
-// Helper to get local date string
 const getLocalDateString = (date: Date = new Date()): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');

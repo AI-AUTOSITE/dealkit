@@ -1,8 +1,20 @@
 // Re-export Brand Types
 export * from './brand';
 
+// Re-export Deal Types (from deal.ts)
+export * from './deal';
+
+// Re-export Invoice Types
+export * from './invoice';
+
+// Re-export Message Types
+export * from './message';
+
+// Re-export Contact Types
+export * from './contact';
+
 // ============================================
-// Deal Types
+// Legacy Deal Types (for old database schema)
 // ============================================
 
 export type DealStatus = 'active' | 'completed' | 'pending' | 'cancelled';
@@ -39,27 +51,6 @@ export type PaymentTerms =
   | 'net_30' 
   | 'net_45' 
   | 'net_60';
-
-export interface Deal {
-  id: string;
-  brand_name: string;
-  campaign_name?: string;
-  rate: number;
-  platform: Platform;
-  content_type: ContentType;
-  deadline: string;
-  status: DealStatus;
-  progress_stage: ProgressStage;
-  contact_name?: string;
-  contact_email?: string;
-  usage_rights?: string;
-  usage_duration?: string;
-  exclusivity?: string;
-  payment_terms: PaymentTerms;
-  notes?: string;
-  created_at: string;
-  updated_at: string;
-}
 
 // ============================================
 // Payment Types
@@ -141,7 +132,7 @@ export interface ContractReview {
 // ============================================
 
 export type Niche = 
-  // Premium niches
+  // High-value niches
   | 'finance'
   | 'crypto'
   | 'tech'
@@ -173,7 +164,7 @@ export interface RateCalculationInput {
   followers: number;
   engagement_rate?: number;
   niche: Niche;
-  // Premium options
+  // Advanced options
   usage_rights?: string[];
   duration?: string;
   exclusivity?: string;
@@ -239,7 +230,7 @@ export type EmailTemplate =
   | 'business_confirmation'
   | 'business_delivery'
   | 'business_thank_you'
-  // Relationship (Premium)
+  // Relationship
   | 'relationship_checkin'
   | 'relationship_recollab';
 
@@ -342,7 +333,7 @@ export interface UsageBreakdown {
 }
 
 // ============================================
-// User & Premium Types
+// User Types
 // ============================================
 
 export interface UserProfile {
@@ -358,35 +349,4 @@ export interface UserProfile {
   created_at: string;
   updated_at: string;
 }
-
-export type PremiumPlan = 'monthly' | 'yearly';
-
-export interface PremiumStatus {
-  id: number;
-  is_premium: boolean;
-  plan_type?: PremiumPlan;
-  purchase_date?: string;
-  expiry_date?: string;
-  transaction_id?: string;
-}
-
-// ============================================
-// Feature Usage Limits
-// ============================================
-
-export interface FeatureLimits {
-  contract_review: { free: number; premium: number };
-  rate_calculator: { free: number; premium: number };
-  email_assistant: { free: number; premium: number };
-  usage_calculator: { free: number; premium: number };
-  active_payments: { free: number; premium: number };
-}
-
-export const FEATURE_LIMITS: FeatureLimits = {
-  contract_review: { free: 2, premium: Infinity },
-  rate_calculator: { free: 5, premium: Infinity },
-  email_assistant: { free: 5, premium: Infinity },
-  usage_calculator: { free: 5, premium: Infinity },
-  active_payments: { free: 3, premium: Infinity },
-};
 

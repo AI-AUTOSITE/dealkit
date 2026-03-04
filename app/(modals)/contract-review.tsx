@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTheme, spacing, fontSize, borderRadius, shadows } from '../../lib/theme';
-import { getDatabase, generateId, getCurrentMonthYear, getLocalDateString } from '../../lib/database';
-import { FEATURE_LIMITS } from '../../types';
+import { getDatabase, generateId, getLocalDateString } from '../../lib/database';
 
 interface RedFlag {
   severity: 'high' | 'medium' | 'low';
@@ -165,34 +164,8 @@ export default function ContractReviewScreen() {
 
   const [contractText, setContractText] = useState('');
   const [result, setResult] = useState<ReviewResult | null>(null);
-  const [usageCount, setUsageCount] = useState(0);
-  const [isPremium, setIsPremium] = useState(false);
   const [analyzing, setAnalyzing] = useState(false);
   const [expandedFlags, setExpandedFlags] = useState<Set<number>>(new Set());
-
-  useEffect(() => {
-    loadUsage();
-  }, []);
-
-  const loadUsage = async () => {
-    try {
-      const db = getDatabase();
-      const monthYear = getCurrentMonthYear();
-      
-      const premium = await db.getFirstAsync<{ is_premium: number }>(
-        'SELECT is_premium FROM premium_status WHERE id = 1'
-      );
-      setIsPremium(premium?.is_premium === 1);
-
-      const usage = await db.getFirstAsync<{ count: number }>(
-        'SELECT COUNT(*) as count FROM usage_tracking WHERE feature = ? AND month_year = ?',
-        ['contract_review', monthYear]
-      );
-      setUsageCount(usage?.count || 0);
-    } catch (error) {
-      console.error('Failed to load usage:', error);
-    }
-  };
 
   const analyzeContract = async () => {
     if (!contractText.trim()) {
@@ -202,15 +175,6 @@ export default function ContractReviewScreen() {
 
     if (contractText.trim().length < 100) {
       Alert.alert('Too Short', 'Please paste more of the contract for accurate analysis.');
-      return;
-    }
-
-    const limit = isPremium ? FEATURE_LIMITS.contract_review.premium : FEATURE_LIMITS.contract_review.free;
-    if (usageCount >= limit) {
-      Alert.alert(
-        'Limit Reached',
-        'You\'ve used all your free reviews this month. Premium will be available when the app launches!'
-      );
       return;
     }
 
@@ -259,17 +223,10 @@ export default function ContractReviewScreen() {
 
       const db = getDatabase();
       await db.runAsync(
-        'INSERT INTO usage_tracking (feature, month_year) VALUES (?, ?)',
-        ['contract_review', getCurrentMonthYear()]
-      );
-
-      await db.runAsync(
         `INSERT INTO contract_reviews (id, contract_text, analysis_result, score, created_at)
          VALUES (?, ?, ?, ?, ?)`,
         [generateId(), contractText.substring(0, 1000), JSON.stringify(redFlags), score, getLocalDateString()]
       );
-
-      setUsageCount(prev => prev + 1);
     } catch (error) {
       console.error('Analysis error:', error);
       Alert.alert('Error', 'Failed to analyze contract. Please try again.');
@@ -300,10 +257,6 @@ export default function ContractReviewScreen() {
       default: return { bg: colors.primaryLight, color: colors.primary, icon: 'information-circle' };
     }
   };
-
-  const remainingUsage = isPremium 
-    ? '∞' 
-    : `${Math.max(0, FEATURE_LIMITS.contract_review.free - usageCount)} of ${FEATURE_LIMITS.contract_review.free}`;
 
   return (
     <KeyboardAvoidingView
@@ -483,13 +436,6 @@ export default function ContractReviewScreen() {
             </TouchableOpacity>
           </Animated.View>
         )}
-
-        <View style={[styles.infoBox, { backgroundColor: colors.card }]}>
-          <Ionicons name="information-circle" size={16} color={colors.primary} />
-          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            {isPremium ? '∞ unlimited reviews' : `FREE: ${remainingUsage} reviews remaining`}
-          </Text>
-        </View>
       </ScrollView>
 
       <TouchableOpacity
@@ -581,15 +527,6 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
   newReviewButtonText: { color: '#FFFFFF', fontSize: fontSize.md, fontWeight: '600' },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    marginTop: spacing.lg,
-    gap: spacing.sm,
-  },
-  infoText: { fontSize: fontSize.sm, flex: 1 },
   floatingClose: {
     position: 'absolute',
     bottom: 30,

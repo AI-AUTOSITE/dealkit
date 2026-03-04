@@ -4,9 +4,7 @@ import { Deal, DealCreateInput, DealStage } from '@/types';
 import { Invoice, InvoiceCreateInput, InvoiceStatus } from '@/types';
 import { Message, MessageCreateInput } from '@/types';
 import { Brand, BrandCreateInput, BrandCategory } from '@/types';
-
-// Note: Removed notification imports to avoid circular dependency
-// Notifications are scheduled in the UI layer instead
+import { scheduleInvoiceReminder, cancelReminder } from '../notifications';
 
 const DATABASE_NAME = 'dealkit_v2.db';
 

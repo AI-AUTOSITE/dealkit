@@ -116,6 +116,7 @@ export const spacing = {
   lg: 24,
   xl: 32,
   xxl: 48,
+  '3xl': 64,
 };
 
 // Common border radius values
@@ -134,6 +135,7 @@ export const fontSize = {
   md: 16,
   lg: 18,
   xl: 20,
+  '2xl': 24,
   xxl: 24,
   xxxl: 32,
 };

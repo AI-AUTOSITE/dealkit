@@ -1,4 +1,11 @@
-import * as FileSystem from 'expo-file-system';
+import {
+  documentDirectory,
+  writeAsStringAsync,
+  readAsStringAsync,
+  deleteAsync,
+  readDirectoryAsync,
+  getInfoAsync,
+} from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
 import { getDatabase, getLocalDateString } from './database';
@@ -30,9 +37,6 @@ export async function exportData(): Promise<{ success: boolean; message: string 
     // Fetch user profile
     const userProfile = await db.getFirstAsync('SELECT * FROM user_profile WHERE id = 1');
 
-    // Fetch premium status
-    const premiumStatus = await db.getFirstAsync('SELECT * FROM premium_status WHERE id = 1');
-
     const exportData: ExportData = {
       version: EXPORT_VERSION,
       exportedAt: new Date().toISOString(),
@@ -40,17 +44,15 @@ export async function exportData(): Promise<{ success: boolean; message: string 
         deals: deals || [],
         payments: payments || [],
         userProfile: userProfile || null,
-        settings: {
-          isPremium: premiumStatus?.is_premium === 1,
-        },
+        settings: {},
       },
     };
 
     // Create file
     const fileName = `dealkit-backup-${getLocalDateString()}.json`;
-    const filePath = `${FileSystem.documentDirectory}${fileName}`;
+    const filePath = `${documentDirectory}${fileName}`;
 
-    await FileSystem.writeAsStringAsync(filePath, JSON.stringify(exportData, null, 2));
+    await writeAsStringAsync(filePath, JSON.stringify(exportData, null, 2));
 
     // Check if sharing is available
     const isAvailable = await Sharing.isAvailableAsync();
@@ -89,7 +91,7 @@ export async function importData(): Promise<{ success: boolean; message: string;
     }
 
     // Read file
-    const content = await FileSystem.readAsStringAsync(file.uri);
+    const content = await readAsStringAsync(file.uri);
     const importData: ExportData = JSON.parse(content);
 
     // Validate
@@ -217,7 +219,7 @@ function migrateData(data: ExportData): ExportData {
 // Get export file info
 export async function getLastExportInfo(): Promise<{ date: string | null; size: string | null }> {
   try {
-    const dirInfo = await FileSystem.readDirectoryAsync(FileSystem.documentDirectory || '');
+    const dirInfo = await readDirectoryAsync(documentDirectory || '');
     const backupFiles = dirInfo.filter(f => f.startsWith('dealkit-backup-'));
     
     if (backupFiles.length === 0) {
@@ -227,8 +229,8 @@ export async function getLastExportInfo(): Promise<{ date: string | null; size: 
     // Get most recent
     backupFiles.sort().reverse();
     const latestFile = backupFiles[0];
-    const filePath = `${FileSystem.documentDirectory}${latestFile}`;
-    const fileInfo = await FileSystem.getInfoAsync(filePath);
+    const filePath = `${documentDirectory}${latestFile}`;
+    const fileInfo = await getInfoAsync(filePath);
 
     if (fileInfo.exists && 'size' in fileInfo) {
       const sizeKB = Math.round(fileInfo.size / 1024);

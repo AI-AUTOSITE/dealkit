@@ -49,7 +49,7 @@ const GUIDE_SECTIONS: GuideSection[] = [
       'Select your platform (Instagram, TikTok, etc.)',
       'Enter your follower count',
       'Add engagement rate for bonus calculation',
-      'Select your niche for premium multipliers',
+      'Select your niche for rate multipliers',
       'Get your recommended rate range!',
     ],
   },
@@ -92,7 +92,7 @@ const GUIDE_SECTIONS: GuideSection[] = [
     emoji: '💾',
     title: 'Backup Your Data',
     steps: [
-      'Go to Settings → Export Data (Premium)',
+      'Go to Settings → Export Data',
       'Your data is saved as a JSON file',
       'Store it in iCloud, Google Drive, etc.',
       'To restore, use Settings → Import Data',
@@ -161,7 +161,7 @@ export default function HowToUseScreen() {
             • Use the Rate Calculator before every negotiation{'\n'}
             • Check contracts with Contract Review before signing{'\n'}
             • Export your data regularly as a backup{'\n'}
-            • Upgrade to Premium for unlimited Pro tool usage
+            • Set up notifications to never miss a payment deadline
           </Text>
         </View>
 

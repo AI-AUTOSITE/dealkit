@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTheme, spacing, fontSize, borderRadius, shadows } from '../../lib/theme';
-import { getDatabase, generateId, getCurrentMonthYear, getLocalDateString } from '../../lib/database';
-import { FEATURE_LIMITS } from '../../types';
+import { getDatabase, generateId, getLocalDateString } from '../../lib/database';
 import { formatCurrency } from '../../lib/utils';
 
 interface UsageOption {
@@ -80,33 +79,7 @@ export default function UsageCalculatorScreen() {
   const [territory, setTerritory] = useState('single_country');
   const [exclusivity, setExclusivity] = useState('none');
   const [result, setResult] = useState<CalculationResult | null>(null);
-  const [usageCount, setUsageCount] = useState(0);
-  const [isPremium, setIsPremium] = useState(false);
   const [calculating, setCalculating] = useState(false);
-
-  useEffect(() => {
-    loadUsage();
-  }, []);
-
-  const loadUsage = async () => {
-    try {
-      const db = getDatabase();
-      const monthYear = getCurrentMonthYear();
-      
-      const premium = await db.getFirstAsync<{ is_premium: number }>(
-        'SELECT is_premium FROM premium_status WHERE id = 1'
-      );
-      setIsPremium(premium?.is_premium === 1);
-
-      const usage = await db.getFirstAsync<{ count: number }>(
-        'SELECT COUNT(*) as count FROM usage_tracking WHERE feature = ? AND month_year = ?',
-        ['usage_calculator', monthYear]
-      );
-      setUsageCount(usage?.count || 0);
-    } catch (error) {
-      console.error('Failed to load usage:', error);
-    }
-  };
 
   const toggleUsageType = (key: string) => {
     setSelectedUsageTypes(prev => {
@@ -126,15 +99,6 @@ export default function UsageCalculatorScreen() {
   };
 
   const calculateUsage = async () => {
-    const limit = isPremium ? FEATURE_LIMITS.usage_calculator.premium : FEATURE_LIMITS.usage_calculator.free;
-    if (usageCount >= limit) {
-      Alert.alert(
-        'Limit Reached',
-        'You\'ve used all your free calculations this month. Premium will be available when the app launches!'
-      );
-      return;
-    }
-
     setCalculating(true);
 
     try {
@@ -179,13 +143,8 @@ export default function UsageCalculatorScreen() {
         },
       });
 
-      // Track usage
+      // Save calculation history
       const db = getDatabase();
-      await db.runAsync(
-        'INSERT INTO usage_tracking (feature, month_year) VALUES (?, ?)',
-        ['usage_calculator', getCurrentMonthYear()]
-      );
-
       await db.runAsync(
         `INSERT INTO usage_calculations (id, base_rate, usage_types, duration, territory, exclusivity, total_fee, created_at)
          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
@@ -200,8 +159,6 @@ export default function UsageCalculatorScreen() {
           getLocalDateString(),
         ]
       );
-
-      setUsageCount(prev => prev + 1);
     } catch (error) {
       console.error('Calculation error:', error);
       Alert.alert('Error', 'Failed to calculate. Please try again.');
@@ -214,10 +171,6 @@ export default function UsageCalculatorScreen() {
     setBaseRate(prev => Math.max(100, prev + amount));
     setResult(null);
   };
-
-  const remainingUsage = isPremium 
-    ? '∞' 
-    : `${Math.max(0, FEATURE_LIMITS.usage_calculator.free - usageCount)} of ${FEATURE_LIMITS.usage_calculator.free}`;
 
   return (
     <KeyboardAvoidingView
@@ -496,14 +449,6 @@ export default function UsageCalculatorScreen() {
             </View>
           </Animated.View>
         )}
-
-        {/* Usage Info */}
-        <View style={[styles.infoBox, { backgroundColor: colors.card }]}>
-          <Ionicons name="information-circle" size={16} color={colors.primary} />
-          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            {isPremium ? '∞ unlimited calculations' : `FREE: ${remainingUsage} calculations remaining`}
-          </Text>
-        </View>
       </ScrollView>
 
       <TouchableOpacity
@@ -625,15 +570,6 @@ const styles = StyleSheet.create({
   },
   totalLabel: { fontSize: fontSize.md, fontWeight: '600' },
   totalValue: { fontSize: fontSize.md, fontWeight: '700' },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    marginTop: spacing.lg,
-    gap: spacing.sm,
-  },
-  infoText: { fontSize: fontSize.sm, flex: 1 },
   floatingClose: {
     position: 'absolute',
     bottom: 30,

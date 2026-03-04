@@ -92,10 +92,10 @@ export function DatePicker({
         />
         <Text
           variant="bodyMd"
-          style={[
-            styles.text,
-            !value && { color: isDark ? colors.neutral500 : colors.neutral400 },
-          ]}
+          style={{
+            ...styles.text,
+            ...(!value && { color: isDark ? colors.neutral500 : colors.neutral400 }),
+          }}
         >
           {displayValue}
         </Text>

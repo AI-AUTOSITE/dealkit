@@ -13,16 +13,21 @@
       "resizeMode": "contain",
       "backgroundColor": "#7C3AED"
     },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "com.dealkit.app"
-    },
+"ios": {
+  "supportsTablet": false,
+  "bundleIdentifier": "com.dealkit.app",
+  "buildNumber": "5",
+  "infoPlist": {
+    "ITSAppUsesNonExemptEncryption": false
+  }
+},
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#7C3AED"
       },
-      "package": "com.dealkit.app"
+      "package": "com.dealkit.app",
+      "versionCode": 5
     },
     "web": {
       "bundler": "metro",
@@ -37,7 +42,8 @@
           "icon": "./assets/icon.png",
           "color": "#7C3AED"
         }
-      ]
+      ],
+      "@react-native-community/datetimepicker"
     ],
     "experiments": {
       "typedRoutes": true

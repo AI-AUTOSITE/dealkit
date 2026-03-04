@@ -41,7 +41,7 @@ export function Toast({
   const insets = useSafeAreaInsets();
   const translateY = useSharedValue(-100);
   const opacity = useSharedValue(0);
-  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const config = TOAST_CONFIG[type];
 

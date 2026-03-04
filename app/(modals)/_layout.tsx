@@ -18,7 +18,6 @@ export default function ModalsLayout() {
           animation: 'slide_from_bottom',
         }}
       >
-      <Stack.Screen name="premium" />
       <Stack.Screen name="rate-calculator" />
       <Stack.Screen name="email-assistant" />
       <Stack.Screen name="contract-review" />
@@ -33,6 +32,8 @@ export default function ModalsLayout() {
       <Stack.Screen name="invoice-detail" />
       <Stack.Screen name="settings/profile" />
       <Stack.Screen name="settings/how-to-use" />
+      <Stack.Screen name="settings/terms" />
+      <Stack.Screen name="settings/privacy" />
     </Stack>
     </>
   );

@@ -23,6 +23,8 @@ import {
 } from '@/lib/notifications';
 import { useDeals, useInvoices } from '@/lib/hooks';
 import { Ionicons } from '@expo/vector-icons';
+import { getDatabase } from '@/lib/database';
+import { UserProfile } from '@/types';
 
 // App version
 const APP_VERSION = '1.0.0';
@@ -116,12 +118,13 @@ export default function ProfileScreen() {
   const [exporting, setExporting] = useState(false);
   const [importing, setImporting] = useState(false);
   const [notificationsEnabled, setNotificationsEnabledState] = useState(false);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   
   // Calculate stats from hooks data
   const totalDeals = deals.length;
   const totalValue = deals.reduce((sum, d) => sum + (d.value || 0), 0);
   const pendingDealsValue = deals
-    .filter(d => d.stage !== 'paid' && d.stage !== 'completed')
+    .filter(d => d.stage !== 'paid')
     .reduce((sum, d) => sum + (d.value || 0), 0);
   const pendingInvoicesValue = invoices
     .filter(inv => inv.status !== 'paid')
@@ -130,13 +133,27 @@ export default function ProfileScreen() {
   
   const statsLoading = dealsLoading || invoicesLoading;
   
+  // Load user profile from database
+  const loadProfile = useCallback(async () => {
+    try {
+      const db = getDatabase();
+      const profile = await db.getFirstAsync<UserProfile>(
+        'SELECT * FROM user_profile WHERE id = 1'
+      );
+      setUserProfile(profile || null);
+    } catch (error) {
+      console.error('Failed to load profile:', error);
+    }
+  }, []);
+  
   // Reload data when screen is focused
   useFocusEffect(
     useCallback(() => {
       console.log('[Profile] Screen focused, reloading data...');
       loadDeals();
       loadInvoices();
-    }, [loadDeals, loadInvoices])
+      loadProfile();
+    }, [loadDeals, loadInvoices, loadProfile])
   );
 
   // Load notification setting on mount
@@ -253,26 +270,38 @@ export default function ProfileScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
-        {/* Profile Card */}
-        <View
+        {/* Profile Card - Tappable to edit */}
+        <TouchableOpacity
           style={[
             styles.profileCard,
             { backgroundColor: isDark ? colors.dark100 : colors.white },
           ]}
+          onPress={() => router.push('/(modals)/settings/profile')}
+          activeOpacity={0.7}
         >
           {/* Avatar */}
           <View style={[styles.avatar, { backgroundColor: colors.primary500 }]}>
             <Text variant="headingXl" style={{ color: colors.white }}>
-              U
+              {userProfile?.display_name ? userProfile.display_name.charAt(0).toUpperCase() : 'U'}
             </Text>
           </View>
           
-          <Text variant="headingLg" style={{ marginTop: 12 }}>
-            Creator
-          </Text>
-          <Text variant="bodyMd" color="secondary">
-            Influencer & Content Creator
-          </Text>
+          <View style={styles.profileInfo}>
+            <View style={styles.nameRow}>
+              <Text variant="headingLg" style={{ marginTop: 12 }}>
+                {userProfile?.display_name || 'Your Name'}
+              </Text>
+              <Ionicons 
+                name="pencil" 
+                size={16} 
+                color={isDark ? colors.neutral500 : colors.neutral400} 
+                style={{ marginLeft: 8, marginTop: 14 }}
+              />
+            </View>
+            <Text variant="bodyMd" color="secondary">
+              {userProfile?.handle ? `@${userProfile.handle}` : 'Tap to edit profile'}
+            </Text>
+          </View>
 
           {/* Stats Row */}
           <View style={styles.statsRow}>
@@ -313,7 +342,7 @@ export default function ProfileScreen() {
               </Text>
             </View>
           </View>
-        </View>
+        </TouchableOpacity>
 
         {/* Appearance Section */}
         <View style={styles.section}>
@@ -419,21 +448,6 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {/* Premium Section */}
-        <View style={styles.section}>
-          <Text variant="headingSm" color="secondary" style={styles.sectionTitle}>
-            PREMIUM
-          </Text>
-          <View style={styles.settingGroup}>
-            <SettingItem
-              icon="star-outline"
-              label="Premium Features"
-              isDark={isDark}
-              onPress={() => router.push('/(modals)/premium')}
-            />
-          </View>
-        </View>
-
         {/* Tools Section */}
         <View style={styles.section}>
           <Text variant="headingSm" color="secondary" style={styles.sectionTitle}>
@@ -507,7 +521,7 @@ export default function ProfileScreen() {
               icon="document-text-outline"
               label="Terms of Service"
               isDark={isDark}
-              onPress={() => console.log('Open ToS')}
+              onPress={() => router.push('/(modals)/settings/terms')}
             />
             <View
               style={[
@@ -519,7 +533,7 @@ export default function ProfileScreen() {
               icon="shield-checkmark-outline"
               label="Privacy Policy"
               isDark={isDark}
-              onPress={() => console.log('Open Privacy')}
+              onPress={() => router.push('/(modals)/settings/privacy')}
             />
           </View>
         </View>
@@ -570,6 +584,13 @@ const styles = StyleSheet.create({
     borderRadius: 40,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  profileInfo: {
+    alignItems: 'center',
+  },
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   statsRow: {
     flexDirection: 'row',

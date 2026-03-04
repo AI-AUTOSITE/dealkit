@@ -1,3 +1,4 @@
+// components/ExternalLink.tsx
 import { Link } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import React from 'react';
@@ -10,13 +11,10 @@ export function ExternalLink(
     <Link
       target="_blank"
       {...props}
-      // @ts-expect-error: External URLs are not typed.
-      href={props.href}
+      href={props.href as any}
       onPress={(e) => {
         if (Platform.OS !== 'web') {
-          // Prevent the default behavior of linking to the default browser on native.
           e.preventDefault();
-          // Open the link in an in-app browser.
           WebBrowser.openBrowserAsync(props.href as string);
         }
       }}

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -14,8 +14,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useTheme, spacing, fontSize, borderRadius, shadows } from '../../lib/theme';
-import { getDatabase, generateId, getCurrentMonthYear } from '../../lib/database';
-import { Platform as PlatformType, ContentType, Niche, FEATURE_LIMITS } from '../../types';
+import { Platform as PlatformType, ContentType, Niche } from '../../types';
 import { formatCurrency, formatNumber } from '../../lib/utils';
 
 const PLATFORMS: { key: PlatformType; label: string; icon: string }[] = [
@@ -47,13 +46,13 @@ const CONTENT_TYPES: Record<PlatformType, { key: ContentType; label: string; bas
   ],
 };
 
-const NICHES: { key: Niche; label: string; multiplier: number; premium?: boolean }[] = [
-  { key: 'finance', label: '💰 Finance', multiplier: 1.8, premium: true },
-  { key: 'crypto', label: '🪙 Crypto', multiplier: 1.7, premium: true },
-  { key: 'tech', label: '💻 Tech', multiplier: 1.5, premium: true },
-  { key: 'legal', label: '⚖️ Legal', multiplier: 1.6, premium: true },
-  { key: 'healthcare', label: '🏥 Healthcare', multiplier: 1.5, premium: true },
-  { key: 'real_estate', label: '🏠 Real Estate', multiplier: 1.4, premium: true },
+const NICHES: { key: Niche; label: string; multiplier: number }[] = [
+  { key: 'finance', label: '💰 Finance', multiplier: 1.8 },
+  { key: 'crypto', label: '🪙 Crypto', multiplier: 1.7 },
+  { key: 'tech', label: '💻 Tech', multiplier: 1.5 },
+  { key: 'legal', label: '⚖️ Legal', multiplier: 1.6 },
+  { key: 'healthcare', label: '🏥 Healthcare', multiplier: 1.5 },
+  { key: 'real_estate', label: '🏠 Real Estate', multiplier: 1.4 },
   { key: 'fashion', label: '👗 Fashion', multiplier: 1.1 },
   { key: 'beauty', label: '💄 Beauty', multiplier: 1.2 },
   { key: 'fitness', label: '💪 Fitness', multiplier: 1.0 },
@@ -87,48 +86,12 @@ export default function RateCalculatorScreen() {
   const [engagementRate, setEngagementRate] = useState('');
   const [niche, setNiche] = useState<Niche>('lifestyle');
   const [result, setResult] = useState<CalculationResult | null>(null);
-  const [usageCount, setUsageCount] = useState(0);
-  const [isPremium, setIsPremium] = useState(false);
   const [calculating, setCalculating] = useState(false);
-
-  useEffect(() => {
-    loadUsage();
-  }, []);
-
-  const loadUsage = async () => {
-    try {
-      const db = getDatabase();
-      const monthYear = getCurrentMonthYear();
-      
-      const premium = await db.getFirstAsync<{ is_premium: number }>(
-        'SELECT is_premium FROM premium_status WHERE id = 1'
-      );
-      setIsPremium(premium?.is_premium === 1);
-
-      const usage = await db.getFirstAsync<{ count: number }>(
-        'SELECT COUNT(*) as count FROM usage_tracking WHERE feature = ? AND month_year = ?',
-        ['rate_calculator', monthYear]
-      );
-      setUsageCount(usage?.count || 0);
-    } catch (error) {
-      console.error('Failed to load usage:', error);
-    }
-  };
 
   const calculateRate = async () => {
     const followersNum = parseInt(followers.replace(/,/g, ''));
     if (!followersNum || followersNum <= 0) {
       Alert.alert('Required', 'Please enter your follower count.');
-      return;
-    }
-
-    // Check usage limit
-    const limit = isPremium ? FEATURE_LIMITS.rate_calculator.premium : FEATURE_LIMITS.rate_calculator.free;
-    if (usageCount >= limit) {
-      Alert.alert(
-        'Limit Reached',
-        'You\'ve used all your free calculations this month. Premium will be available when the app launches!'
-      );
       return;
     }
 
@@ -180,14 +143,6 @@ export default function RateCalculatorScreen() {
 
       setResult({ min: minRate, max: maxRate, breakdown });
 
-      // Track usage
-      const db = getDatabase();
-      await db.runAsync(
-        'INSERT INTO usage_tracking (feature, month_year) VALUES (?, ?)',
-        ['rate_calculator', getCurrentMonthYear()]
-      );
-      setUsageCount(prev => prev + 1);
-
     } catch (error) {
       console.error('Calculation error:', error);
       Alert.alert('Error', 'Failed to calculate rate. Please try again.');
@@ -202,10 +157,6 @@ export default function RateCalculatorScreen() {
       Alert.alert('Copied!', text);
     }
   };
-
-  const remainingUsage = isPremium 
-    ? '∞' 
-    : `${Math.max(0, FEATURE_LIMITS.rate_calculator.free - usageCount)} of ${FEATURE_LIMITS.rate_calculator.free}`;
 
   return (
     <KeyboardAvoidingView
@@ -453,14 +404,6 @@ export default function RateCalculatorScreen() {
             </TouchableOpacity>
           </Animated.View>
         )}
-
-        {/* Usage Info */}
-        <View style={[styles.infoBox, { backgroundColor: colors.card }]}>
-          <Ionicons name="information-circle" size={16} color={colors.primary} />
-          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            {isPremium ? '∞ unlimited calculations' : `FREE: ${remainingUsage} calculations remaining`}
-          </Text>
-        </View>
       </ScrollView>
 
       {/* Floating Close Button */}
@@ -575,15 +518,6 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   copyButtonText: { fontSize: fontSize.sm, fontWeight: '500' },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    marginTop: spacing.lg,
-    gap: spacing.sm,
-  },
-  infoText: { fontSize: fontSize.sm, flex: 1 },
   floatingClose: {
     position: 'absolute',
     bottom: 30,

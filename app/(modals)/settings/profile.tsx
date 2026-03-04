@@ -10,6 +10,7 @@ import {
   Platform,
   Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, spacing, borderRadius, fontSize, shadows } from '../../../lib/theme';
@@ -23,15 +24,13 @@ const PLATFORMS: { key: PlatformType; label: string }[] = [
   { key: 'twitter', label: 'Twitter' },
 ];
 
-const NICHES: { key: Niche; label: string; premium?: boolean }[] = [
-  // Premium
-  { key: 'finance', label: '💰 Finance', premium: true },
-  { key: 'crypto', label: '🪙 Crypto', premium: true },
-  { key: 'tech', label: '💻 Tech', premium: true },
-  { key: 'legal', label: '⚖️ Legal', premium: true },
-  { key: 'healthcare', label: '🏥 Healthcare', premium: true },
-  { key: 'real_estate', label: '🏠 Real Estate', premium: true },
-  // Standard
+const NICHES: { key: Niche; label: string }[] = [
+  { key: 'finance', label: '💰 Finance' },
+  { key: 'crypto', label: '🪙 Crypto' },
+  { key: 'tech', label: '💻 Tech' },
+  { key: 'legal', label: '⚖️ Legal' },
+  { key: 'healthcare', label: '🏥 Healthcare' },
+  { key: 'real_estate', label: '🏠 Real Estate' },
   { key: 'fashion', label: '👗 Fashion' },
   { key: 'beauty', label: '💄 Beauty' },
   { key: 'fitness', label: '💪 Fitness' },
@@ -147,7 +146,7 @@ export default function ProfileScreen() {
   };
 
   return (
-    <View style={[styles.container, { backgroundColor: colors.background }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
       <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => router.back()}>
@@ -318,7 +317,7 @@ export default function ProfileScreen() {
       >
         <Ionicons name="close" size={24} color={colors.text} />
       </TouchableOpacity>
-    </View>
+    </SafeAreaView>
   );
 }
 

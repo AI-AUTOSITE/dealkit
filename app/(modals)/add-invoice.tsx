@@ -53,7 +53,7 @@ export default function AddInvoiceModal() {
         amount: parseFloat(amount) || 0,
         description: description.trim() || undefined,
         dueDate: dueDateStr,
-        status: 'pending',
+        status: 'draft',
       };
 
       const newInvoice = await createInvoice(input);

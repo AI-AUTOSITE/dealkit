@@ -231,40 +231,12 @@ export async function initDatabase(): Promise<void> {
       FOREIGN KEY (deal_id) REFERENCES deals(id) ON DELETE SET NULL
     );
 
-    -- Usage Tracking (for free tier limits)
-    CREATE TABLE IF NOT EXISTS usage_tracking (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      feature TEXT NOT NULL,
-      used_at TEXT DEFAULT CURRENT_TIMESTAMP,
-      month_year TEXT NOT NULL
-    );
-
-    -- Premium Status
-    CREATE TABLE IF NOT EXISTS premium_status (
-      id INTEGER PRIMARY KEY DEFAULT 1,
-      is_premium INTEGER DEFAULT 0,
-      subscription_type TEXT,
-      plan_type TEXT,
-      purchase_date TEXT,
-      expiry_date TEXT,
-      transaction_id TEXT
-    );
-
     -- Create indexes for better performance
     CREATE INDEX IF NOT EXISTS idx_deals_status ON deals(status);
     CREATE INDEX IF NOT EXISTS idx_deals_deadline ON deals(deadline);
     CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
     CREATE INDEX IF NOT EXISTS idx_payments_due_date ON payments(due_date);
-    CREATE INDEX IF NOT EXISTS idx_usage_tracking_feature ON usage_tracking(feature, month_year);
   `);
-  
-  // Initialize premium status if not exists
-  const premiumCheck = await db.getFirstAsync<{ count: number }>(
-    'SELECT COUNT(*) as count FROM premium_status'
-  );
-  if (premiumCheck && premiumCheck.count === 0) {
-    await db.runAsync('INSERT INTO premium_status (id, is_premium) VALUES (1, 0)');
-  }
   
   // Set database version
   await db.execAsync(`PRAGMA user_version = ${DB_VERSION}`);
@@ -295,10 +267,4 @@ export function getLocalDateString(date: Date = new Date()): string {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
-}
-
-// Get current month-year string for usage tracking
-export function getCurrentMonthYear(): string {
-  const now = new Date();
-  return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 }

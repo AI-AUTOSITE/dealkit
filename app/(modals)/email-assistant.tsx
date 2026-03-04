@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   View,
   Text,
@@ -15,8 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTheme, spacing, fontSize, borderRadius, shadows } from '../../lib/theme';
-import { getDatabase, generateId, getCurrentMonthYear } from '../../lib/database';
-import { EmailTemplate, EmailTone, FEATURE_LIMITS } from '../../types';
+import { EmailTemplate, EmailTone } from '../../types';
 
 interface TemplateInfo {
   key: EmailTemplate;
@@ -24,7 +23,6 @@ interface TemplateInfo {
   category: string;
   icon: string;
   fields: string[];
-  premium?: boolean;
 }
 
 const TEMPLATES: TemplateInfo[] = [
@@ -36,15 +34,15 @@ const TEMPLATES: TemplateInfo[] = [
   { key: 'payment_pre_due', label: 'Pre-Due Reminder', category: 'Payment', icon: 'time', fields: ['brand_name', 'contact_name', 'amount', 'due_date'] },
   { key: 'payment_day_1', label: 'Day 1 Overdue', category: 'Payment', icon: 'alert', fields: ['brand_name', 'contact_name', 'amount', 'invoice_date'] },
   { key: 'payment_day_7', label: 'Day 7 Overdue', category: 'Payment', icon: 'alert-circle', fields: ['brand_name', 'contact_name', 'amount', 'invoice_date'] },
-  { key: 'payment_day_14', label: 'Day 14 Overdue', category: 'Payment', icon: 'warning', fields: ['brand_name', 'contact_name', 'amount', 'invoice_date'], premium: true },
-  { key: 'payment_day_30', label: 'Day 30 Overdue', category: 'Payment', icon: 'flame', fields: ['brand_name', 'contact_name', 'amount', 'invoice_date'], premium: true },
+  { key: 'payment_day_14', label: 'Day 14 Overdue', category: 'Payment', icon: 'warning', fields: ['brand_name', 'contact_name', 'amount', 'invoice_date'] },
+  { key: 'payment_day_30', label: 'Day 30 Overdue', category: 'Payment', icon: 'flame', fields: ['brand_name', 'contact_name', 'amount', 'invoice_date'] },
   // Business
   { key: 'business_confirmation', label: 'Deal Confirmation', category: 'Business', icon: 'checkmark-circle', fields: ['brand_name', 'contact_name', 'campaign_name', 'deliverables', 'deadline'] },
   { key: 'business_delivery', label: 'Content Delivery', category: 'Business', icon: 'paper-plane', fields: ['brand_name', 'contact_name', 'content_type'] },
   { key: 'business_thank_you', label: 'Thank You', category: 'Business', icon: 'heart', fields: ['brand_name', 'contact_name'] },
-  // Relationship (Premium)
-  { key: 'relationship_checkin', label: 'Check-in', category: 'Relationship', icon: 'chatbubble', fields: ['brand_name', 'contact_name', 'last_project'], premium: true },
-  { key: 'relationship_recollab', label: 'Re-collaboration', category: 'Relationship', icon: 'refresh', fields: ['brand_name', 'contact_name', 'idea'], premium: true },
+  // Relationship
+  { key: 'relationship_checkin', label: 'Check-in', category: 'Relationship', icon: 'chatbubble', fields: ['brand_name', 'contact_name', 'last_project'] },
+  { key: 'relationship_recollab', label: 'Re-collaboration', category: 'Relationship', icon: 'refresh', fields: ['brand_name', 'contact_name', 'idea'] },
 ];
 
 const TONES: { key: EmailTone; label: string; emoji: string }[] = [
@@ -129,42 +127,9 @@ export default function EmailAssistantScreen() {
   const [tone, setTone] = useState<EmailTone>('friendly');
   const [formData, setFormData] = useState<Record<string, string>>({});
   const [generatedEmail, setGeneratedEmail] = useState<{ subject: string; body: string } | null>(null);
-  const [usageCount, setUsageCount] = useState(0);
-  const [isPremium, setIsPremium] = useState(false);
   const [generating, setGenerating] = useState(false);
 
-  useEffect(() => {
-    loadUsage();
-  }, []);
-
-  const loadUsage = async () => {
-    try {
-      const db = getDatabase();
-      const monthYear = getCurrentMonthYear();
-      
-      const premium = await db.getFirstAsync<{ is_premium: number }>(
-        'SELECT is_premium FROM premium_status WHERE id = 1'
-      );
-      setIsPremium(premium?.is_premium === 1);
-
-      const usage = await db.getFirstAsync<{ count: number }>(
-        'SELECT COUNT(*) as count FROM usage_tracking WHERE feature = ? AND month_year = ?',
-        ['email_assistant', monthYear]
-      );
-      setUsageCount(usage?.count || 0);
-    } catch (error) {
-      console.error('Failed to load usage:', error);
-    }
-  };
-
   const handleSelectTemplate = (template: TemplateInfo) => {
-    if (template.premium && !isPremium) {
-      Alert.alert(
-        'Coming Soon! 🚀',
-        'This template will be available when the app launches. Stay tuned!'
-      );
-      return;
-    }
     setSelectedTemplate(template.key);
     setFormData({});
     setGeneratedEmail(null);
@@ -190,29 +155,11 @@ export default function EmailAssistantScreen() {
       }
     }
 
-    // Check usage limit
-    const limit = isPremium ? FEATURE_LIMITS.email_assistant.premium : FEATURE_LIMITS.email_assistant.free;
-    if (usageCount >= limit) {
-      Alert.alert(
-        'Limit Reached',
-        'You\'ve used all your free emails this month. Premium will be available when the app launches!'
-      );
-      return;
-    }
-
     setGenerating(true);
     try {
       const templateFn = EMAIL_TEMPLATES[selectedTemplate];
       const email = templateFn(formData, tone);
       setGeneratedEmail(email);
-
-      // Track usage
-      const db = getDatabase();
-      await db.runAsync(
-        'INSERT INTO usage_tracking (feature, month_year) VALUES (?, ?)',
-        ['email_assistant', getCurrentMonthYear()]
-      );
-      setUsageCount(prev => prev + 1);
     } catch (error) {
       console.error('Generation error:', error);
       Alert.alert('Error', 'Failed to generate email. Please try again.');
@@ -227,9 +174,6 @@ export default function EmailAssistantScreen() {
   };
 
   const currentTemplate = TEMPLATES.find(t => t.key === selectedTemplate);
-  const remainingUsage = isPremium 
-    ? '∞' 
-    : `${Math.max(0, FEATURE_LIMITS.email_assistant.free - usageCount)} of ${FEATURE_LIMITS.email_assistant.free}`;
 
   return (
     <KeyboardAvoidingView
@@ -276,8 +220,7 @@ export default function EmailAssistantScreen() {
                       key={template.key}
                       style={[
                         styles.templateCard, 
-                        { backgroundColor: colors.card },
-                        template.premium && !isPremium && { opacity: 0.6 }
+                        { backgroundColor: colors.card }
                       ]}
                       onPress={() => handleSelectTemplate(template)}
                       activeOpacity={0.7}
@@ -285,19 +228,14 @@ export default function EmailAssistantScreen() {
                       <Ionicons 
                         name={template.icon as any} 
                         size={24} 
-                        color={template.premium && !isPremium ? colors.textMuted : colors.primary} 
+                        color={colors.primary} 
                       />
                       <Text style={[
                         styles.templateLabel, 
-                        { color: template.premium && !isPremium ? colors.textMuted : colors.text }
+                        { color: colors.text }
                       ]}>
                         {template.label}
                       </Text>
-                      {template.premium && !isPremium && (
-                        <View style={[styles.premiumBadge, { backgroundColor: colors.textMuted }]}>
-                          <Text style={styles.premiumBadgeText}>SOON</Text>
-                        </View>
-                      )}
                     </TouchableOpacity>
                   ))}
                 </View>
@@ -435,14 +373,6 @@ export default function EmailAssistantScreen() {
             </TouchableOpacity>
           </>
         )}
-
-        {/* Usage Info */}
-        <View style={[styles.infoBox, { backgroundColor: colors.card }]}>
-          <Ionicons name="information-circle" size={16} color={colors.primary} />
-          <Text style={[styles.infoText, { color: colors.textSecondary }]}>
-            {isPremium ? '∞ unlimited emails' : `FREE: ${remainingUsage} emails remaining`}
-          </Text>
-        </View>
       </ScrollView>
 
       {/* Floating Close Button */}
@@ -452,8 +382,9 @@ export default function EmailAssistantScreen() {
         activeOpacity={0.8}
       >
         <Ionicons name="close" size={24} color={colors.text} />
-      </TouchableOpacity>
+</TouchableOpacity>
     </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -495,15 +426,6 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   templateLabel: { fontSize: fontSize.sm, fontWeight: '500', textAlign: 'center' },
-  premiumBadge: {
-    position: 'absolute',
-    top: spacing.xs,
-    right: spacing.xs,
-    paddingHorizontal: spacing.xs,
-    paddingVertical: 2,
-    borderRadius: borderRadius.sm,
-  },
-  premiumBadgeText: { fontSize: 8, fontWeight: '700', color: '#FFFFFF' },
   inputGroup: { marginBottom: spacing.md },
   label: { fontSize: fontSize.sm, fontWeight: '500', marginBottom: spacing.xs },
   input: {
@@ -553,15 +475,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   copyAllButtonText: { color: '#FFFFFF', fontSize: fontSize.md, fontWeight: '600' },
-  infoBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: borderRadius.md,
-    marginTop: spacing.lg,
-    gap: spacing.sm,
-  },
-  infoText: { fontSize: fontSize.sm, flex: 1 },
   floatingClose: {
     position: 'absolute',
     bottom: 30,
