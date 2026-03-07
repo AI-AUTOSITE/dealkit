@@ -1,5 +1,5 @@
 // app/(tabs)/profile.tsx
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -9,7 +9,6 @@ import {
   Alert,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Text } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
@@ -27,7 +26,7 @@ import { getDatabase } from '@/lib/database';
 import { UserProfile } from '@/types';
 
 // App version
-const APP_VERSION = '1.0.0';
+const APP_VERSION = '1.1.0';
 
 interface SettingItemProps {
   icon: string;
@@ -132,6 +131,84 @@ export default function ProfileScreen() {
   const pendingValue = pendingDealsValue + pendingInvoicesValue;
   
   const statsLoading = dealsLoading || invoicesLoading;
+  
+  // Dashboard computations
+  const dashboardData = useMemo(() => {
+    // Monthly earnings (last 6 months)
+    const now = new Date();
+    const months: { label: string; earned: number }[] = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthStr = d.toLocaleDateString('en-US', { month: 'short' });
+      const yearMonth = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const earned = invoices
+        .filter(inv => inv.status === 'paid' && inv.paidDate?.startsWith(yearMonth))
+        .reduce((sum, inv) => sum + (inv.paidAmount || inv.amount || 0), 0);
+      months.push({ label: monthStr, earned });
+    }
+    const maxEarned = Math.max(...months.map(m => m.earned), 1);
+
+    // Total earned from paid invoices
+    const totalEarned = invoices
+      .filter(inv => inv.status === 'paid')
+      .reduce((sum, inv) => sum + (inv.paidAmount || inv.amount || 0), 0);
+
+    // Completed deals count
+    const completedDeals = deals.filter(d => d.stage === 'paid').length;
+
+    // Average deal value (paid deals only)
+    const paidDeals = deals.filter(d => d.stage === 'paid');
+    const avgDealValue = paidDeals.length > 0
+      ? paidDeals.reduce((sum, d) => sum + (d.value || 0), 0) / paidDeals.length
+      : 0;
+
+    // Top brands by earned amount
+    const brandMap = new Map<string, number>();
+    invoices
+      .filter(inv => inv.status === 'paid')
+      .forEach(inv => {
+        const current = brandMap.get(inv.brandName) || 0;
+        brandMap.set(inv.brandName, current + (inv.paidAmount || inv.amount || 0));
+      });
+    const topBrands = Array.from(brandMap.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([name, amount]) => ({ name, amount }));
+
+    // Deal stage distribution
+    const stageCount = new Map<string, number>();
+    deals.forEach(d => {
+      const current = stageCount.get(d.stage) || 0;
+      stageCount.set(d.stage, current + 1);
+    });
+    const stageLabels: Record<string, string> = {
+      pitched: 'Pitched',
+      negotiating: 'Negotiating',
+      contracted: 'Contracted',
+      in_progress: 'In Progress',
+      delivered: 'Delivered',
+      invoiced: 'Invoiced',
+      paid: 'Paid',
+    };
+    const stageColors: Record<string, string> = {
+      pitched: colors.neutral400,
+      negotiating: colors.warning500,
+      contracted: colors.primary500,
+      in_progress: '#3B82F6',
+      delivered: '#8B5CF6',
+      invoiced: '#F97316',
+      paid: colors.success500,
+    };
+    const stages = Array.from(stageCount.entries())
+      .map(([stage, count]) => ({
+        stage,
+        label: stageLabels[stage] || stage,
+        count,
+        color: stageColors[stage] || colors.neutral400,
+      }));
+
+    return { months, maxEarned, totalEarned, completedDeals, avgDealValue, topBrands, stages };
+  }, [deals, invoices]);
   
   // Load user profile from database
   const loadProfile = useCallback(async () => {
@@ -258,12 +335,11 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView
+    <View
       style={[
         styles.container,
         { backgroundColor: isDark ? colors.dark200 : colors.neutral50 },
       ]}
-      edges={['top']}
     >
       <ScrollView
         style={styles.scrollView}
@@ -343,6 +419,114 @@ export default function ProfileScreen() {
             </View>
           </View>
         </TouchableOpacity>
+
+        {/* Dashboard Section */}
+        <View style={styles.section}>
+          <Text variant="headingSm" color="secondary" style={styles.sectionTitle}>
+            DASHBOARD
+          </Text>
+
+          {/* Summary Cards */}
+          <View style={styles.dashGrid}>
+            <View style={[styles.dashCard, { backgroundColor: isDark ? colors.dark100 : colors.white }]}>
+              <Ionicons name="cash-outline" size={20} color={colors.success500} />
+              <Text variant="headingMd" style={{ color: colors.success500, marginTop: 4 }}>
+                ${dashboardData.totalEarned.toLocaleString()}
+              </Text>
+              <Text variant="bodySm" color="secondary">Total Earned</Text>
+            </View>
+            <View style={[styles.dashCard, { backgroundColor: isDark ? colors.dark100 : colors.white }]}>
+              <Ionicons name="trending-up-outline" size={20} color={colors.primary500} />
+              <Text variant="headingMd" style={{ color: colors.primary500, marginTop: 4 }}>
+                ${Math.round(dashboardData.avgDealValue).toLocaleString()}
+              </Text>
+              <Text variant="bodySm" color="secondary">Avg Deal</Text>
+            </View>
+            <View style={[styles.dashCard, { backgroundColor: isDark ? colors.dark100 : colors.white }]}>
+              <Ionicons name="checkmark-done-outline" size={20} color={'#8B5CF6'} />
+              <Text variant="headingMd" style={{ color: '#8B5CF6', marginTop: 4 }}>
+                {dashboardData.completedDeals}
+              </Text>
+              <Text variant="bodySm" color="secondary">Completed</Text>
+            </View>
+          </View>
+
+          {/* Monthly Earnings Chart */}
+          <View style={[styles.chartCard, { backgroundColor: isDark ? colors.dark100 : colors.white }]}>
+            <Text variant="headingSm" style={{ marginBottom: 16 }}>
+              Monthly Earnings
+            </Text>
+            <View style={styles.chartContainer}>
+              {dashboardData.months.map((month, index) => (
+                <View key={index} style={styles.chartBarCol}>
+                  <View style={styles.chartBarWrapper}>
+                    <View
+                      style={[
+                        styles.chartBar,
+                        {
+                          height: month.earned > 0
+                            ? `${Math.max((month.earned / dashboardData.maxEarned) * 100, 5)}%`
+                            : 4,
+                          backgroundColor: month.earned > 0 ? colors.primary500 : (isDark ? colors.neutral700 : colors.neutral200),
+                          borderRadius: 4,
+                        },
+                      ]}
+                    />
+                  </View>
+                  <Text variant="bodySm" color="secondary" style={styles.chartLabel}>
+                    {month.label}
+                  </Text>
+                  {month.earned > 0 && (
+                    <Text style={[styles.chartValue, { color: isDark ? colors.neutral300 : colors.neutral600 }]}>
+                      ${month.earned >= 1000 ? `${(month.earned / 1000).toFixed(1)}k` : month.earned}
+                    </Text>
+                  )}
+                </View>
+              ))}
+            </View>
+            {dashboardData.months.every(m => m.earned === 0) && (
+              <Text variant="bodySm" color="secondary" style={{ textAlign: 'center', marginTop: 8 }}>
+                Mark payments as paid to see your earnings here
+              </Text>
+            )}
+          </View>
+
+          {/* Deal Pipeline */}
+          {dashboardData.stages.length > 0 && (
+            <View style={[styles.chartCard, { backgroundColor: isDark ? colors.dark100 : colors.white }]}>
+              <Text variant="headingSm" style={{ marginBottom: 12 }}>
+                Deal Pipeline
+              </Text>
+              {dashboardData.stages.map((item, index) => (
+                <View key={item.stage} style={styles.pipelineRow}>
+                  <View style={[styles.pipelineDot, { backgroundColor: item.color }]} />
+                  <Text variant="bodyMd" style={{ flex: 1 }}>{item.label}</Text>
+                  <Text variant="headingSm" style={{ color: item.color }}>{item.count}</Text>
+                </View>
+              ))}
+            </View>
+          )}
+
+          {/* Top Brands */}
+          {dashboardData.topBrands.length > 0 && (
+            <View style={[styles.chartCard, { backgroundColor: isDark ? colors.dark100 : colors.white }]}>
+              <Text variant="headingSm" style={{ marginBottom: 12 }}>
+                Top Brands
+              </Text>
+              {dashboardData.topBrands.map((brand, index) => (
+                <View key={brand.name} style={styles.pipelineRow}>
+                  <Text variant="headingSm" style={{ color: colors.primary500, marginRight: 10, width: 20 }}>
+                    {index + 1}
+                  </Text>
+                  <Text variant="bodyMd" style={{ flex: 1 }}>{brand.name}</Text>
+                  <Text variant="headingSm" style={{ color: colors.success500 }}>
+                    ${brand.amount.toLocaleString()}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </View>
 
         {/* Appearance Section */}
         <View style={styles.section}>
@@ -548,7 +732,7 @@ export default function ProfileScreen() {
           </Text>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -649,5 +833,74 @@ const styles = StyleSheet.create({
   footer: {
     alignItems: 'center',
     paddingVertical: 32,
+  },
+  // Dashboard styles
+  dashGrid: {
+    flexDirection: 'row',
+    marginHorizontal: 16,
+    gap: 10,
+    marginBottom: 10,
+  },
+  dashCard: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 14,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  chartCard: {
+    marginHorizontal: 16,
+    marginBottom: 10,
+    padding: 16,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  chartContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    height: 120,
+    gap: 8,
+  },
+  chartBarCol: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  chartBarWrapper: {
+    width: '100%',
+    height: 90,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  chartBar: {
+    width: '70%',
+    minWidth: 16,
+  },
+  chartLabel: {
+    marginTop: 6,
+    fontSize: 11,
+  },
+  chartValue: {
+    fontSize: 10,
+    marginTop: 2,
+  },
+  pipelineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  pipelineDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    marginRight: 10,
   },
 });

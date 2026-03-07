@@ -18,6 +18,7 @@ export default function TabsLayout() {
           fontWeight: '600',
         },
         headerShadowVisible: false,
+        freezeOnBlur: true,
         tabBarStyle: {
           backgroundColor: colors.background,
           borderTopColor: colors.border,

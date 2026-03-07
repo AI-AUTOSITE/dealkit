@@ -11,9 +11,10 @@ interface BrandCardProps {
   brand: Brand;
   onPress: (brand: Brand) => void;
   onFavorite: (id: string) => void;
+  noteCount?: number;
 }
 
-export function BrandCard({ brand, onPress, onFavorite }: BrandCardProps) {
+export function BrandCard({ brand, onPress, onFavorite, noteCount }: BrandCardProps) {
   const { isDark } = useTheme();
   
   const categoryInfo = BRAND_CATEGORIES.find(c => c.value === brand.category);
@@ -56,6 +57,14 @@ export function BrandCard({ brand, onPress, onFavorite }: BrandCardProps) {
           <Text variant="bodySm" color="secondary" style={{ marginLeft: 4 }}>
             {categoryInfo?.label || 'Other'}
           </Text>
+          {noteCount != null && noteCount > 0 && (
+            <View style={styles.noteBadge}>
+              <Ionicons name="document-text" size={11} color={isDark ? colors.neutral300 : colors.neutral500} />
+              <Text variant="bodySm" color="secondary" style={{ marginLeft: 2, fontSize: 11 }}>
+                {noteCount}
+              </Text>
+            </View>
+          )}
         </View>
 
         {brand.description && (
@@ -113,5 +122,14 @@ const styles = StyleSheet.create({
   },
   favoriteButton: {
     padding: 8,
+  },
+  noteBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: 8,
+    backgroundColor: 'rgba(124,58,237,0.1)',
   },
 });

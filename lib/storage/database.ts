@@ -106,6 +106,18 @@ async function ensureDatabase(): Promise<SQLite.SQLiteDatabase> {
         )
       `);
 
+      // Create brand_notes table
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS brand_notes (
+          id TEXT PRIMARY KEY,
+          brand_id TEXT NOT NULL,
+          content TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+        )
+      `);
+      await db.execAsync('CREATE INDEX IF NOT EXISTS idx_brand_notes_brand_id ON brand_notes(brand_id)');
+
       isInitialized = true;
       console.log('Database initialized successfully');
     } catch (error) {
@@ -808,6 +820,72 @@ export async function deleteMessage(id: string): Promise<boolean> {
     console.error('deleteMessage error:', error);
     return false;
   }
+}
+
+// ============ BRAND NOTES ============
+
+export interface BrandNote {
+  id: string;
+  brandId: string;
+  content: string;
+  createdAt: string;
+}
+
+export async function getBrandNotes(brandId: string): Promise<BrandNote[]> {
+  const database = await ensureDatabase();
+  const rows = await database.getAllAsync<any>(
+    'SELECT * FROM brand_notes WHERE brand_id = ? ORDER BY created_at DESC',
+    [brandId]
+  );
+  return rows.map(row => ({
+    id: row.id,
+    brandId: row.brand_id,
+    content: row.content,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function addBrandNote(brandId: string, content: string): Promise<BrandNote> {
+  const database = await ensureDatabase();
+  const id = generateId();
+  const now = new Date().toISOString();
+
+  await database.runAsync(
+    'INSERT INTO brand_notes (id, brand_id, content, created_at) VALUES (?, ?, ?, ?)',
+    [id, brandId, content, now]
+  );
+
+  return { id, brandId, content, createdAt: now };
+}
+
+export async function deleteBrandNote(id: string): Promise<boolean> {
+  try {
+    const database = await ensureDatabase();
+    const result = await database.runAsync('DELETE FROM brand_notes WHERE id = ?', [id]);
+    return result.changes > 0;
+  } catch (error) {
+    console.error('deleteBrandNote error:', error);
+    return false;
+  }
+}
+
+export async function getBrandNoteCount(brandId: string): Promise<number> {
+  const database = await ensureDatabase();
+  const row = await database.getFirstAsync<{ count: number }>(
+    'SELECT COUNT(*) as count FROM brand_notes WHERE brand_id = ?',
+    [brandId]
+  );
+  return row?.count || 0;
+}
+
+export async function getAllBrandNoteCounts(): Promise<Map<string, number>> {
+  const database = await ensureDatabase();
+  const rows = await database.getAllAsync<{ brand_id: string; count: number }>(
+    'SELECT brand_id, COUNT(*) as count FROM brand_notes GROUP BY brand_id'
+  );
+  const map = new Map<string, number>();
+  rows.forEach(row => map.set(row.brand_id, row.count));
+  return map;
 }
 
 // ============ STATS ============

@@ -7,20 +7,25 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  ScrollView,
+  Animated,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, spacing, borderRadius, fontSize, shadows } from '../../lib/theme';
 import { useInvoices } from '@/lib/hooks';
 import { Invoice, InvoiceStatus } from '@/types';
+import { onDealPaid } from '@/lib/review';
+import { AnimatedListItem, useFabBounce } from '@/lib/animations';
 
-type FilterStatus = 'all' | 'pending' | 'paid' | 'overdue';
+type FilterStatus = 'all' | 'pending' | 'due_soon' | 'paid' | 'overdue';
 
 const STATUS_FILTERS: { key: FilterStatus; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'pending', label: 'Pending' },
-  { key: 'paid', label: 'Paid' },
+  { key: 'due_soon', label: 'Due Soon' },
   { key: 'overdue', label: 'Overdue' },
+  { key: 'paid', label: 'Paid' },
 ];
 
 // Helper to get local date string
@@ -37,6 +42,9 @@ export default function PaymentsScreen() {
   const { invoices, loading, loadInvoices, editInvoice } = useInvoices();
   const [filter, setFilter] = useState<FilterStatus>('all');
   const [refreshing, setRefreshing] = useState(false);
+
+  // Animations
+  const { scale: fabScale } = useFabBounce();
 
   // Reload when screen focuses
   useFocusEffect(
@@ -82,6 +90,7 @@ export default function PaymentsScreen() {
     if (invoice.status === 'paid') return 'paid';
     if (invoice.status === 'overdue') return 'overdue';
     if (invoice.dueDate && invoice.dueDate < today) return 'overdue';
+    if (invoice.dueDate && invoice.dueDate >= today && invoice.dueDate < threeDaysStr) return 'due_soon';
     return 'pending';
   };
 
@@ -185,17 +194,20 @@ export default function PaymentsScreen() {
         paidDate: getLocalDateString(),
         paidAmount: invoice.amount,
       });
+      // Trigger review prompt check (non-blocking)
+      onDealPaid();
     } catch (error) {
       console.error('Failed to mark as paid:', error);
     }
   };
 
-  const renderPaymentCard = ({ item }: { item: Invoice }) => {
+  const renderPaymentCard = ({ item, index }: { item: Invoice; index: number }) => {
     const daysInfo = getDaysInfo(item);
     const filterStatus = getFilterStatus(item);
     const isNeedsAttention = filterStatus === 'overdue' || daysInfo.color === colors.warning;
 
     return (
+      <AnimatedListItem index={index} screenKey="payments">
       <TouchableOpacity
         style={[styles.card, { backgroundColor: colors.card }]}
         onPress={() => router.push(`/(modals)/payment/${item.id}`)}
@@ -245,33 +257,27 @@ export default function PaymentsScreen() {
           </View>
         )}
       </TouchableOpacity>
+      </AnimatedListItem>
     );
   };
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Stats Card */}
+      {/* Stats Card - Compact 1-row */}
       <View style={[styles.statsCard, { backgroundColor: colors.card }]}>
-        <Text style={[styles.statsTitle, { color: colors.text }]}>Payment Summary</Text>
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: colors.text }]}>
               {formatCurrency(stats.pending)}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>Pending</Text>
-            <Text style={[styles.statCount, { color: colors.textMuted }]}>
-              {stats.pendingCount} deals
-            </Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
             <Text style={[styles.statValue, { color: colors.warning }]}>
               {formatCurrency(stats.dueSoon)}
             </Text>
-            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Due Soon</Text>
-            <Text style={[styles.statCount, { color: colors.textMuted }]}>
-              {stats.dueSoonCount} deals
-            </Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Soon</Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
@@ -279,9 +285,6 @@ export default function PaymentsScreen() {
               {formatCurrency(stats.overdue)}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>Overdue</Text>
-            <Text style={[styles.statCount, { color: colors.textMuted }]}>
-              {stats.overdueCount} deals
-            </Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
@@ -289,15 +292,17 @@ export default function PaymentsScreen() {
               {formatCurrency(stats.paid)}
             </Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>Paid</Text>
-            <Text style={[styles.statCount, { color: colors.textMuted }]}>
-              {stats.paidCount} deals
-            </Text>
           </View>
         </View>
       </View>
 
       {/* Filter Tabs */}
-      <View style={styles.filterContainer}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.filterScroll}
+        contentContainerStyle={styles.filterContainer}
+      >
         {STATUS_FILTERS.map((item) => (
           <TouchableOpacity
             key={item.key}
@@ -317,7 +322,7 @@ export default function PaymentsScreen() {
             </Text>
           </TouchableOpacity>
         ))}
-      </View>
+      </ScrollView>
 
       {/* Payments List */}
       <FlatList
@@ -335,25 +340,40 @@ export default function PaymentsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="wallet-outline" size={48} color={colors.textMuted} />
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              {filter === 'all' ? 'No payments yet' : `No ${filter} payments`}
+            <View style={[styles.emptyIconCircle, { backgroundColor: colors.success + '15' }]}>
+              <Ionicons name="wallet" size={32} color={colors.success} />
+            </View>
+            <Text style={[styles.emptyText, { color: colors.text }]}>
+              {filter === 'all' ? 'Track Your Income' : `No ${filter} payments`}
             </Text>
             <Text style={[styles.emptySubtext, { color: colors.textMuted }]}>
-              Tap + to add a payment
+              {filter === 'all'
+                ? 'Never miss a payment again.\nAdd invoices and track when brands pay you.'
+                : 'Payments will appear here when their status matches this filter.'}
             </Text>
+            {filter === 'all' && (
+              <TouchableOpacity
+                style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+                onPress={() => router.push('/(modals)/add-invoice')}
+              >
+                <Ionicons name="add" size={20} color="#FFFFFF" />
+                <Text style={styles.emptyButtonText}>Add Payment</Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
       />
 
       {/* FAB */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: colors.primary }]}
-        onPress={() => router.push('/(modals)/add-invoice')}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="add" size={28} color="#FFFFFF" />
-      </TouchableOpacity>
+      <Animated.View style={[styles.fab, { backgroundColor: colors.primary, transform: [{ scale: fabScale }] }]}>
+        <TouchableOpacity
+          style={styles.fabInner}
+          onPress={() => router.push('/(modals)/add-invoice')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 }
@@ -374,19 +394,13 @@ const styles = StyleSheet.create({
   statsCard: {
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
-    padding: spacing.lg,
+    padding: spacing.md,
     borderRadius: borderRadius.lg,
     ...shadows.sm,
   },
-  statsTitle: {
-    fontSize: fontSize.md,
-    fontWeight: '600',
-    marginBottom: spacing.md,
-    textAlign: 'center',
-  },
   statsRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-around',
   },
   statItem: {
@@ -401,17 +415,19 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
     marginTop: 2,
   },
-  statCount: {
-    fontSize: fontSize.xs,
-  },
   statDivider: {
     width: 1,
-    height: 50,
+    height: 32,
+  },
+  filterScroll: {
+    flexGrow: 0,
+    marginBottom: spacing.md,
   },
   filterContainer: {
     flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.lg,
-    marginBottom: spacing.md,
+    paddingRight: spacing.xl,
     gap: spacing.sm,
   },
   filterTab: {
@@ -490,16 +506,42 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing['3xl'],
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
+  },
+  emptyIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.sm,
   },
   emptyText: {
     fontSize: fontSize.lg,
-    fontWeight: '500',
-    marginTop: spacing.md,
+    fontWeight: '600',
+    marginTop: spacing.sm,
+    textAlign: 'center',
   },
   emptySubtext: {
     fontSize: fontSize.sm,
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: borderRadius.full,
+    marginTop: spacing.md,
+    gap: 6,
+  },
+  emptyButtonText: {
+    color: '#FFFFFF',
+    fontSize: fontSize.md,
+    fontWeight: '600',
   },
   fab: {
     position: 'absolute',
@@ -511,5 +553,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.lg,
+  },
+  fabInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

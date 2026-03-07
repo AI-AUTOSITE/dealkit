@@ -1,5 +1,5 @@
 // lib/hooks/useDeals.ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Deal, DealCreateInput, DealStage } from '@/types';
 import {
   getAllDeals,
@@ -13,11 +13,15 @@ export function useDeals() {
   const [deals, setDeals] = useState<Deal[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isInitialLoad = useRef(true);
 
   // Load all deals
   const loadDeals = useCallback(async () => {
     try {
-      setLoading(true);
+      // Only show loading spinner on first load
+      if (isInitialLoad.current) {
+        setLoading(true);
+      }
       setError(null);
       const data = await getAllDeals();
       setDeals(data);
@@ -26,6 +30,7 @@ export function useDeals() {
       console.error('Load deals error:', err);
     } finally {
       setLoading(false);
+      isInitialLoad.current = false;
     }
   }, []);
 

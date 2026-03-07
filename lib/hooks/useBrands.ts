@@ -1,5 +1,5 @@
 // lib/hooks/useBrands.ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Brand, BrandCreateInput, BrandCategory } from '@/types';
 import {
   getAllBrands,
@@ -13,10 +13,13 @@ export function useBrands() {
   const [brands, setBrands] = useState<Brand[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isInitialLoad = useRef(true);
 
   const loadBrands = useCallback(async () => {
     try {
-      setLoading(true);
+      if (isInitialLoad.current) {
+        setLoading(true);
+      }
       setError(null);
       const data = await getAllBrands();
       setBrands(data);
@@ -25,6 +28,7 @@ export function useBrands() {
       console.error('Load brands error:', err);
     } finally {
       setLoading(false);
+      isInitialLoad.current = false;
     }
   }, []);
 

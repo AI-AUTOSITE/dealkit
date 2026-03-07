@@ -4,7 +4,7 @@ import * as SQLite from 'expo-sqlite';
 let db: SQLite.SQLiteDatabase | null = null;
 
 // Database version for migrations
-const DB_VERSION = 3;
+const DB_VERSION = 4;
 
 // Initialize database
 export async function initDatabase(): Promise<void> {
@@ -87,6 +87,25 @@ export async function initDatabase(): Promise<void> {
       console.log('Migration to version 3 completed');
     } catch (e) {
       console.log('Migration to v3 error:', e);
+    }
+  }
+
+  // Migration from version 3 to 4: Add brand_notes table
+  if (currentVersion >= 1 && currentVersion < 4) {
+    try {
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS brand_notes (
+          id TEXT PRIMARY KEY,
+          brand_id TEXT NOT NULL,
+          content TEXT NOT NULL,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+        )
+      `);
+      await db.execAsync('CREATE INDEX IF NOT EXISTS idx_brand_notes_brand_id ON brand_notes(brand_id)');
+      console.log('Migration to version 4 completed');
+    } catch (e) {
+      console.log('Migration to v4 error:', e);
     }
   }
   
@@ -236,6 +255,16 @@ export async function initDatabase(): Promise<void> {
     CREATE INDEX IF NOT EXISTS idx_deals_deadline ON deals(deadline);
     CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
     CREATE INDEX IF NOT EXISTS idx_payments_due_date ON payments(due_date);
+
+    -- Brand Notes
+    CREATE TABLE IF NOT EXISTS brand_notes (
+      id TEXT PRIMARY KEY,
+      brand_id TEXT NOT NULL,
+      content TEXT NOT NULL,
+      created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (brand_id) REFERENCES brands(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_brand_notes_brand_id ON brand_notes(brand_id);
   `);
   
   // Set database version

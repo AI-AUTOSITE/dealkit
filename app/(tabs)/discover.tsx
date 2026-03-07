@@ -7,8 +7,8 @@ import {
   TextInput,
   TouchableOpacity,
   RefreshControl,
+  Animated,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 import { Text, SkeletonCard } from '@/components/ui';
 import { BrandCard, CategoryTabs } from '@/components/discover';
@@ -16,7 +16,9 @@ import { useTheme } from '@/lib/theme';
 import { colors } from '@/design-tokens/primitives/colors';
 import { useBrands, useRefresh } from '@/lib/hooks';
 import { Brand, BrandCategory } from '@/types';
+import { getAllBrandNoteCounts } from '@/lib/storage/database';
 import { Ionicons } from '@expo/vector-icons';
+import { AnimatedListItem, useFabBounce } from '@/lib/animations';
 
 export default function DiscoverScreen() {
   const { isDark } = useTheme();
@@ -24,6 +26,10 @@ export default function DiscoverScreen() {
   
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<BrandCategory | 'all' | 'favorites'>('all');
+  const [noteCounts, setNoteCounts] = useState<Map<string, number>>(new Map());
+
+  // Animations
+  const { scale: fabScale } = useFabBounce();
 
   // Pull to refresh
   const { refreshing, onRefresh } = useRefresh(loadBrands);
@@ -31,6 +37,7 @@ export default function DiscoverScreen() {
   useFocusEffect(
     useCallback(() => {
       loadBrands();
+      getAllBrandNoteCounts().then(setNoteCounts).catch(() => {});
     }, [loadBrands])
   );
 
@@ -72,12 +79,11 @@ export default function DiscoverScreen() {
   );
 
   return (
-    <SafeAreaView
+    <View
       style={[
         styles.container,
         { backgroundColor: isDark ? colors.dark200 : colors.white },
       ]}
-      edges={['top']}
     >
       {/* Search Bar */}
       <View style={styles.searchContainer}>
@@ -121,40 +127,60 @@ export default function DiscoverScreen() {
       />
 
       {/* Brand List */}
-      {loading && !refreshing ? (
+      {loading && !refreshing && brands.length === 0 ? (
         renderSkeletons()
       ) : filteredBrands.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <Ionicons
-            name={selectedCategory === 'favorites' ? 'heart-outline' : 'business-outline'}
-            size={64}
-            color={isDark ? colors.neutral600 : colors.neutral300}
-          />
-          <Text variant="headingMd" style={{ marginTop: 16 }}>
+          <View style={[
+            styles.emptyIconCircle,
+            { backgroundColor: selectedCategory === 'favorites'
+              ? (isDark ? 'rgba(239,68,68,0.15)' : 'rgba(239,68,68,0.1)')
+              : (isDark ? 'rgba(124,58,237,0.15)' : 'rgba(124,58,237,0.1)')
+            }
+          ]}>
+            <Ionicons
+              name={selectedCategory === 'favorites' ? 'heart' : 'business'}
+              size={40}
+              color={selectedCategory === 'favorites' ? colors.error500 : colors.primary500}
+            />
+          </View>
+          <Text variant="headingMd" style={{ marginTop: 8 }}>
             {selectedCategory === 'favorites'
               ? 'No favorites yet'
               : searchQuery || selectedCategory !== 'all'
               ? 'No brands found'
-              : 'No brands yet'}
+              : 'Build Your Brand Network'}
           </Text>
-          <Text variant="bodyMd" color="secondary" style={{ marginTop: 8, textAlign: 'center' }}>
+          <Text variant="bodyMd" color="secondary" style={{ marginTop: 8, textAlign: 'center', lineHeight: 20 }}>
             {selectedCategory === 'favorites'
-              ? 'Tap the heart icon on brands you like'
+              ? 'Tap the heart icon on brands you love\nto find them quickly here.'
               : searchQuery || selectedCategory !== 'all'
-              ? 'Try a different search or category'
-              : 'Tap + to add your first brand'}
+              ? 'Try a different search or category.'
+              : 'Save brand contacts, add notes,\nand keep track of every relationship.'}
           </Text>
+          {selectedCategory === 'all' && !searchQuery && (
+            <TouchableOpacity
+              style={[styles.emptyButton, { backgroundColor: colors.primary500 }]}
+              onPress={() => router.push('/(modals)/add-brand')}
+            >
+              <Ionicons name="add" size={20} color={colors.white} />
+              <Text style={styles.emptyButtonText}>Add First Brand</Text>
+            </TouchableOpacity>
+          )}
         </View>
       ) : (
         <FlatList
           data={filteredBrands}
           keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <BrandCard
-              brand={item}
-              onPress={handleBrandPress}
-              onFavorite={toggleFavorite}
-            />
+          renderItem={({ item, index }) => (
+            <AnimatedListItem index={index} screenKey="discover">
+              <BrandCard
+                brand={item}
+                onPress={handleBrandPress}
+                onFavorite={toggleFavorite}
+                noteCount={noteCounts.get(item.id)}
+              />
+            </AnimatedListItem>
           )}
           contentContainerStyle={styles.listContent}
           showsVerticalScrollIndicator={false}
@@ -170,14 +196,16 @@ export default function DiscoverScreen() {
       )}
 
       {/* FAB */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: colors.primary500 }]}
-        onPress={handleAddBrand}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="add" size={28} color={colors.white} />
-      </TouchableOpacity>
-    </SafeAreaView>
+      <Animated.View style={[styles.fab, { backgroundColor: colors.primary500, transform: [{ scale: fabScale }] }]}>
+        <TouchableOpacity
+          style={styles.fabInner}
+          onPress={handleAddBrand}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={28} color={colors.white} />
+        </TouchableOpacity>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -211,6 +239,28 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 32,
   },
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 999,
+    marginTop: 20,
+    gap: 6,
+  },
+  emptyButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
   listContent: {
     paddingTop: 8,
     paddingBottom: 100,
@@ -229,5 +279,12 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  fabInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

@@ -29,12 +29,14 @@ export default function AddDealModal() {
   const [brandName, setBrandName] = useState('');
   const [title, setTitle] = useState('');
   const [value, setValue] = useState('');
+  const [deliverables, setDeliverables] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState<Date | null>(null);
 
   // Refs for focusing next input
   const titleRef = useRef<TextInput>(null);
   const valueRef = useRef<TextInput>(null);
+  const deliverablesRef = useRef<TextInput>(null);
   const descriptionRef = useRef<TextInput>(null);
 
   const handleSave = async () => {
@@ -55,6 +57,7 @@ export default function AddDealModal() {
         title: title.trim() || `${brandName.trim()} Deal`,
         value: parseFloat(value) || 0,
         description: description.trim() || undefined,
+        deliverables: deliverables.trim() || undefined,
         stage: 'pitched',
         dueDate,
       };
@@ -166,7 +169,27 @@ export default function AddDealModal() {
                   placeholderTextColor={placeholderColor}
                   keyboardType="numeric"
                   returnKeyType="next"
-                  onSubmitEditing={() => descriptionRef.current?.focus()}
+                  onSubmitEditing={() => deliverablesRef.current?.focus()}
+                  blurOnSubmit={false}
+                />
+              </View>
+
+              {/* Deliverables */}
+              <View style={styles.field}>
+                <Text variant="headingSm" style={styles.label}>
+                  Deliverables
+                </Text>
+                <TextInput
+                  ref={deliverablesRef}
+                  style={[inputStyle, styles.textArea, { minHeight: 80 }]}
+                  value={deliverables}
+                  onChangeText={setDeliverables}
+                  placeholder="1x Instagram Reel, 2x Stories, 1x Blog Post..."
+                  placeholderTextColor={placeholderColor}
+                  multiline
+                  numberOfLines={3}
+                  textAlignVertical="top"
+                  returnKeyType="next"
                   blurOnSubmit={false}
                 />
               </View>

@@ -1,5 +1,5 @@
 // lib/hooks/useInvoices.ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Invoice, InvoiceCreateInput } from '@/types';
 import {
   getAllInvoices,
@@ -21,10 +21,13 @@ export function useInvoices() {
     thisMonth: 0,
     invoiceCount: 0,
   });
+  const isInitialLoad = useRef(true);
 
   const loadInvoices = useCallback(async () => {
     try {
-      setLoading(true);
+      if (isInitialLoad.current) {
+        setLoading(true);
+      }
       setError(null);
       const [data, statsData] = await Promise.all([
         getAllInvoices(),
@@ -37,6 +40,7 @@ export function useInvoices() {
       console.error('Load invoices error:', err);
     } finally {
       setLoading(false);
+      isInitialLoad.current = false;
     }
   }, []);
 

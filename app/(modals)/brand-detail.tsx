@@ -18,7 +18,7 @@ import { Text, Button } from '@/components/ui';
 import { useTheme } from '@/lib/theme';
 import { colors } from '@/design-tokens/primitives/colors';
 import { Brand, BrandCategory, BRAND_CATEGORIES } from '@/types';
-import { getBrandById, updateBrand, deleteBrand, toggleBrandFavorite } from '@/lib/storage/database';
+import { getBrandById, updateBrand, deleteBrand, toggleBrandFavorite, getBrandNotes, addBrandNote, deleteBrandNote, BrandNote } from '@/lib/storage/database';
 import { useToast } from '@/lib/toast';
 import { Ionicons } from '@expo/vector-icons';
 
@@ -40,6 +40,12 @@ export default function BrandDetailModal() {
   const [website, setWebsite] = useState('');
   const [instagram, setInstagram] = useState('');
   const [email, setEmail] = useState('');
+  
+  // Notes state
+  const [notes, setNotes] = useState<BrandNote[]>([]);
+  const [noteText, setNoteText] = useState('');
+  const [addingNote, setAddingNote] = useState(false);
+  const noteInputRef = useRef<TextInput>(null);
 
   // Load brand
   useEffect(() => {
@@ -55,6 +61,9 @@ export default function BrandDetailModal() {
           setWebsite(data.website || '');
           setInstagram(data.instagram || '');
           setEmail(data.email || '');
+          // Load notes
+          const brandNotes = await getBrandNotes(id);
+          setNotes(brandNotes);
         }
       } catch (err) {
         console.error('Load brand error:', err);
@@ -65,6 +74,47 @@ export default function BrandDetailModal() {
     }
     loadBrand();
   }, [id]);
+
+  const handleAddNote = async () => {
+    if (!brand || !noteText.trim()) return;
+    setAddingNote(true);
+    try {
+      const note = await addBrandNote(brand.id, noteText.trim());
+      setNotes(prev => [note, ...prev]);
+      setNoteText('');
+      Keyboard.dismiss();
+    } catch (err) {
+      showToast('Failed to add note', 'error');
+    } finally {
+      setAddingNote(false);
+    }
+  };
+
+  const handleDeleteNote = (noteId: string) => {
+    Alert.alert('Delete Note', 'Are you sure?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await deleteBrandNote(noteId);
+            setNotes(prev => prev.filter(n => n.id !== noteId));
+          } catch (err) {
+            showToast('Failed to delete note', 'error');
+          }
+        },
+      },
+    ]);
+  };
+
+  const formatNoteDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+    return d.toLocaleDateString('en-US', {
+      month: 'short', day: 'numeric', year: 'numeric',
+      hour: 'numeric', minute: '2-digit',
+    });
+  };
 
   const handleSave = async () => {
     if (!brand) return;
@@ -476,6 +526,81 @@ export default function BrandDetailModal() {
                 )}
               </View>
 
+              {/* Notes Section */}
+              <View style={styles.notesSection}>
+                <Text variant="headingSm" style={styles.detailLabel}>
+                  Notes ({notes.length})
+                </Text>
+                
+                {/* Add Note Input */}
+                <View style={styles.noteInputRow}>
+                  <TextInput
+                    ref={noteInputRef}
+                    style={[
+                      styles.noteInput,
+                      {
+                        backgroundColor: isDark ? colors.dark50 : colors.neutral100,
+                        borderColor: isDark ? colors.neutral700 : colors.neutral300,
+                        color: isDark ? colors.neutral100 : colors.neutral900,
+                      },
+                    ]}
+                    value={noteText}
+                    onChangeText={setNoteText}
+                    placeholder="Add a quick note..."
+                    placeholderTextColor={isDark ? colors.neutral500 : colors.neutral400}
+                    multiline
+                    maxLength={500}
+                  />
+                  <TouchableOpacity
+                    style={[
+                      styles.noteAddButton,
+                      {
+                        backgroundColor: noteText.trim() ? colors.primary500 : (isDark ? colors.neutral700 : colors.neutral200),
+                      },
+                    ]}
+                    onPress={handleAddNote}
+                    disabled={!noteText.trim() || addingNote}
+                  >
+                    <Ionicons
+                      name="send"
+                      size={18}
+                      color={noteText.trim() ? colors.white : (isDark ? colors.neutral500 : colors.neutral400)}
+                    />
+                  </TouchableOpacity>
+                </View>
+
+                {/* Notes List */}
+                {notes.map((note) => (
+                  <View
+                    key={note.id}
+                    style={[
+                      styles.noteItem,
+                      { backgroundColor: isDark ? colors.dark100 : colors.neutral50 },
+                    ]}
+                  >
+                    <View style={styles.noteContent}>
+                      <Text variant="bodyMd">{note.content}</Text>
+                      <Text variant="bodySm" color="secondary" style={{ marginTop: 4 }}>
+                        {formatNoteDate(note.createdAt)}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => handleDeleteNote(note.id)}
+                      hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                      style={styles.noteDeleteButton}
+                    >
+                      <Ionicons name="trash-outline" size={16} color={colors.neutral400} />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+
+                {notes.length === 0 && (
+                  <Text variant="bodySm" color="secondary" style={{ textAlign: 'center', marginTop: 8 }}>
+                    No notes yet. Add your first note above!
+                  </Text>
+                )}
+              </View>
+
               {/* Delete Button */}
               <TouchableOpacity
                 style={styles.deleteButton}
@@ -627,5 +752,47 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 4,
+  },
+  // Notes styles
+  notesSection: {
+    marginTop: 24,
+    marginBottom: 24,
+  },
+  noteInputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: 8,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+  noteInput: {
+    flex: 1,
+    borderWidth: 1,
+    borderRadius: 12,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    fontSize: 15,
+    minHeight: 42,
+    maxHeight: 100,
+  },
+  noteAddButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  noteItem: {
+    flexDirection: 'row',
+    padding: 12,
+    borderRadius: 10,
+    marginBottom: 8,
+  },
+  noteContent: {
+    flex: 1,
+  },
+  noteDeleteButton: {
+    padding: 4,
+    marginLeft: 8,
   },
 });

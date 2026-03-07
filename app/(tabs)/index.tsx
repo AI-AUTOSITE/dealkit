@@ -7,12 +7,14 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  Animated,
 } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, spacing, borderRadius, fontSize, shadows } from '../../lib/theme';
 import { useDeals } from '@/lib/hooks';
 import { Deal, DealStage } from '@/types';
+import { AnimatedListItem, useFabBounce, useCountUp } from '@/lib/animations';
 
 type FilterStatus = 'all' | 'active' | 'completed' | 'pending';
 
@@ -37,7 +39,7 @@ const getStatusFromStage = (stage: DealStage): 'active' | 'completed' | 'pending
 };
 
 // Stage progression for progress dots
-const PROGRESS_STAGES: DealStage[] = ['pitched', 'negotiating', 'contracted', 'in_progress', 'delivered'];
+const PROGRESS_STAGES: DealStage[] = ['pitched', 'negotiating', 'contracted', 'in_progress', 'delivered', 'invoiced', 'paid'];
 
 export default function DealsScreen() {
   const { colors } = useTheme();
@@ -45,6 +47,11 @@ export default function DealsScreen() {
   const { deals, loading, loadDeals, totalValue } = useDeals();
   const [filter, setFilter] = useState<FilterStatus>('all');
   const [refreshing, setRefreshing] = useState(false);
+
+  // Animations
+  const { scale: fabScale } = useFabBounce();
+  const animatedActive = useCountUp(deals.filter(d => getStatusFromStage(d.stage) === 'active').length);
+  const animatedCompleted = useCountUp(deals.filter(d => d.stage === 'paid').length);
 
   // Reload when screen focuses
   useFocusEffect(
@@ -115,11 +122,12 @@ export default function DealsScreen() {
     return PROGRESS_STAGES.indexOf(stage);
   };
 
-  const renderDealCard = ({ item }: { item: Deal }) => {
+  const renderDealCard = ({ item, index }: { item: Deal; index: number }) => {
     const daysLeft = getDaysUntilDeadline(item.dueDate);
     const progressIndex = getProgressIndex(item.stage);
     
     return (
+      <AnimatedListItem index={index} screenKey="deals">
       <TouchableOpacity
         style={[styles.dealCard, { backgroundColor: colors.card }]}
         onPress={() => router.push(`/(modals)/deal/${item.id}`)}
@@ -176,6 +184,7 @@ export default function DealsScreen() {
           ))}
         </View>
       </TouchableOpacity>
+      </AnimatedListItem>
     );
   };
 
@@ -183,16 +192,22 @@ export default function DealsScreen() {
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Stats Card */}
       <View style={[styles.statsCard, { backgroundColor: colors.card }]}>
-        <Text style={[styles.statsTitle, { color: colors.text }]}>Quick Stats</Text>
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.text }]}>{activeDeals}</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>{animatedActive}</Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>Active</Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
-            <Text style={[styles.statValue, { color: colors.text }]}>{completedDeals}</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>{animatedCompleted}</Text>
             <Text style={[styles.statLabel, { color: colors.textMuted }]}>Completed</Text>
+          </View>
+          <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
+          <View style={styles.statItem}>
+            <Text style={[styles.statValue, { color: colors.primary }]}>
+              {formatCurrency(totalValue)}
+            </Text>
+            <Text style={[styles.statLabel, { color: colors.textMuted }]}>Pipeline</Text>
           </View>
           <View style={[styles.statDivider, { backgroundColor: colors.border }]} />
           <View style={styles.statItem}>
@@ -243,25 +258,40 @@ export default function DealsScreen() {
         }
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="briefcase-outline" size={48} color={colors.textMuted} />
-            <Text style={[styles.emptyText, { color: colors.textMuted }]}>
-              {filter === 'all' ? 'No deals yet' : `No ${filter} deals`}
+            <View style={[styles.emptyIconCircle, { backgroundColor: colors.primary + '15' }]}>
+              <Ionicons name="briefcase" size={40} color={colors.primary} />
+            </View>
+            <Text style={[styles.emptyText, { color: colors.text }]}>
+              {filter === 'all' ? 'Start Tracking Deals' : `No ${filter} deals`}
             </Text>
             <Text style={[styles.emptySubtext, { color: colors.textMuted }]}>
-              Tap + to add your first deal
+              {filter === 'all'
+                ? 'Track brand partnerships from pitch to payment.\nTap + to add your first deal!'
+                : 'Deals will appear here when their status matches this filter.'}
             </Text>
+            {filter === 'all' && (
+              <TouchableOpacity
+                style={[styles.emptyButton, { backgroundColor: colors.primary }]}
+                onPress={() => router.push('/(modals)/add-deal')}
+              >
+                <Ionicons name="add" size={20} color="#FFFFFF" />
+                <Text style={styles.emptyButtonText}>Add First Deal</Text>
+              </TouchableOpacity>
+            )}
           </View>
         }
       />
 
       {/* FAB */}
-      <TouchableOpacity
-        style={[styles.fab, { backgroundColor: colors.primary }]}
-        onPress={() => router.push('/(modals)/add-deal')}
-        activeOpacity={0.8}
-      >
-        <Ionicons name="add" size={28} color="#FFFFFF" />
-      </TouchableOpacity>
+      <Animated.View style={[styles.fab, { backgroundColor: colors.primary, transform: [{ scale: fabScale }] }]}>
+        <TouchableOpacity
+          style={styles.fabInner}
+          onPress={() => router.push('/(modals)/add-deal')}
+          activeOpacity={0.8}
+        >
+          <Ionicons name="add" size={28} color="#FFFFFF" />
+        </TouchableOpacity>
+      </Animated.View>
     </View>
   );
 }
@@ -388,15 +418,41 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing['3xl'],
+    paddingHorizontal: spacing.lg,
+  },
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.md,
   },
   emptyText: {
     fontSize: fontSize.lg,
-    fontWeight: '500',
-    marginTop: spacing.md,
+    fontWeight: '600',
+    marginTop: spacing.sm,
+    textAlign: 'center',
   },
   emptySubtext: {
     fontSize: fontSize.sm,
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  emptyButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: borderRadius.full,
+    marginTop: spacing.lg,
+    gap: 6,
+  },
+  emptyButtonText: {
+    color: '#FFFFFF',
+    fontSize: fontSize.md,
+    fontWeight: '600',
   },
   fab: {
     position: 'absolute',
@@ -408,5 +464,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.lg,
+  },
+  fabInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

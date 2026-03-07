@@ -1,5 +1,5 @@
 // lib/hooks/useMessages.ts
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Message, MessageCreateInput } from '@/types';
 import {
   getAllMessages,
@@ -13,10 +13,13 @@ export function useMessages() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const isInitialLoad = useRef(true);
 
   const loadMessages = useCallback(async () => {
     try {
-      setLoading(true);
+      if (isInitialLoad.current) {
+        setLoading(true);
+      }
       setError(null);
       const data = await getAllMessages();
       setMessages(data);
@@ -25,6 +28,7 @@ export function useMessages() {
       console.error('Load messages error:', err);
     } finally {
       setLoading(false);
+      isInitialLoad.current = false;
     }
   }, []);
 

@@ -12,7 +12,6 @@ import {
   Alert,
   Modal,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect, router } from 'expo-router';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Text } from '@/components/ui';
@@ -342,12 +341,11 @@ export default function InboxScreen() {
   const minDate = new Date();
 
   return (
-    <SafeAreaView
+    <View
       style={[
         styles.container,
         { backgroundColor: isDark ? colors.dark200 : colors.white },
       ]}
-      edges={['top']}
     >
       {/* Header Actions */}
       <View style={styles.header}>
@@ -414,16 +412,14 @@ export default function InboxScreen() {
           // Action Items View
           actionItems.length === 0 ? (
             <View style={styles.emptyContainer}>
-              <Ionicons
-                name="checkmark-circle-outline"
-                size={64}
-                color={isDark ? colors.neutral600 : colors.neutral300}
-              />
-              <Text variant="headingMd" style={{ marginTop: 16 }}>
-                All caught up! 🎉
+              <View style={[styles.emptyIconCircle, { backgroundColor: isDark ? 'rgba(34,197,94,0.15)' : 'rgba(34,197,94,0.1)' }]}>
+                <Ionicons name="checkmark-circle" size={40} color="#22C55E" />
+              </View>
+              <Text variant="headingMd" style={{ marginTop: 8 }}>
+                All Caught Up! 🎉
               </Text>
-              <Text variant="bodyMd" color="secondary" style={{ marginTop: 8, textAlign: 'center' }}>
-                No action items right now.{'\n'}Check back later!
+              <Text variant="bodyMd" color="secondary" style={{ marginTop: 8, textAlign: 'center', lineHeight: 20 }}>
+                No overdue payments or upcoming deadlines.{'\n'}You're on top of your game!
               </Text>
             </View>
           ) : (
@@ -447,16 +443,14 @@ export default function InboxScreen() {
           <>
             {messages.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Ionicons
-                  name="document-text-outline"
-                  size={64}
-                  color={isDark ? colors.neutral600 : colors.neutral300}
-                />
-                <Text variant="headingMd" style={{ marginTop: 16 }}>
-                  No notes yet
+                <View style={[styles.emptyIconCircle, { backgroundColor: isDark ? 'rgba(124,58,237,0.15)' : 'rgba(124,58,237,0.1)' }]}>
+                  <Ionicons name="document-text" size={40} color={colors.primary500} />
+                </View>
+                <Text variant="headingMd" style={{ marginTop: 8 }}>
+                  Your Notebook
                 </Text>
-                <Text variant="bodyMd" color="secondary" style={{ marginTop: 8, textAlign: 'center' }}>
-                  Add notes, tasks, or reminders{'\n'}for your deals
+                <Text variant="bodyMd" color="secondary" style={{ marginTop: 8, textAlign: 'center', lineHeight: 20 }}>
+                  Jot down ideas, tasks, or reminders.{'\n'}Type below to add your first note!
                 </Text>
               </View>
             ) : (
@@ -655,7 +649,7 @@ export default function InboxScreen() {
           </View>
         </Modal>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -723,6 +717,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 32,
+  },
+  emptyIconCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
   },
   listContent: {
     padding: 16,
