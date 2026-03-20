@@ -26,7 +26,7 @@ import { getDatabase } from '@/lib/storage/database';
 import { UserProfile } from '@/types';
 
 // App version
-const APP_VERSION = '1.1.0';
+const APP_VERSION = '1.1.1';
 
 interface SettingItemProps {
   icon: string;

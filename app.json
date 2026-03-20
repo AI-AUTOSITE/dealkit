@@ -2,7 +2,7 @@
   "expo": {
     "name": "DealKit",
     "slug": "dealkit",
-    "version": "1.1.0",
+    "version": "1.1.1",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "scheme": "dealkit",
@@ -16,7 +16,7 @@
 "ios": {
   "supportsTablet": false,
   "bundleIdentifier": "com.dealkit.app",
-  "buildNumber": "6",
+  "buildNumber": "7",
   "infoPlist": {
     "ITSAppUsesNonExemptEncryption": false
   }
@@ -27,7 +27,7 @@
         "backgroundColor": "#7C3AED"
       },
       "package": "com.dealkit.app",
-      "versionCode": 6
+      "versionCode": 7
     },
     "web": {
       "bundler": "metro",
