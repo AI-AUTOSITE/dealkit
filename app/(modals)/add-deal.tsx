@@ -49,8 +49,14 @@ export default function AddDealModal() {
       setLoading(true);
       Keyboard.dismiss();
 
-      // Format deadline as ISO string if set
-      const dueDate = deadline ? deadline.toISOString().split('T')[0] : undefined;
+      // Format deadline as local date string (YYYY-MM-DD)
+      let dueDate: string | undefined;
+      if (deadline) {
+        const y = deadline.getFullYear();
+        const m = String(deadline.getMonth() + 1).padStart(2, '0');
+        const d = String(deadline.getDate()).padStart(2, '0');
+        dueDate = `${y}-${m}-${d}`;
+      }
 
       const input: DealCreateInput = {
         brandName: brandName.trim(),

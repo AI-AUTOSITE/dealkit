@@ -45,8 +45,14 @@ export default function AddInvoiceModal() {
       setLoading(true);
       Keyboard.dismiss();
 
-      // Format due date as ISO string if set
-      const dueDateStr = dueDate ? dueDate.toISOString().split('T')[0] : undefined;
+      // Format due date as local date string (YYYY-MM-DD)
+      let dueDateStr: string | undefined;
+      if (dueDate) {
+        const y = dueDate.getFullYear();
+        const m = String(dueDate.getMonth() + 1).padStart(2, '0');
+        const d = String(dueDate.getDate()).padStart(2, '0');
+        dueDateStr = `${y}-${m}-${d}`;
+      }
 
       const input: InvoiceCreateInput = {
         brandName: brandName.trim(),

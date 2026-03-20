@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme, spacing, borderRadius, fontSize, shadows } from '../../../lib/theme';
-import { getDatabase, getLocalDateString } from '../../../lib/database';
+import { getDatabase, getLocalDateString } from '../../../lib/storage/database';
 import { Platform as PlatformType, Niche, UserProfile } from '../../../types';
 
 const PLATFORMS: { key: PlatformType; label: string }[] = [

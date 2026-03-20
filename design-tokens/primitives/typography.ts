@@ -1,4 +1,8 @@
 // design-tokens/primitives/typography.ts
+// NOTE: These are design-system reference values.
+// Screen-level fontSize is imported from lib/theme.tsx (which uses different values).
+// components/ui/Text.tsx uses its own variantStyles.
+// Do NOT mix these with lib/theme.tsx fontSize imports.
 export const fontSize = {
   xs: 11,
   sm: 12,

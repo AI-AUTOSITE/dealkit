@@ -69,11 +69,13 @@ export function useCountUp(target: number, duration: number = 600): number {
 
     // Only animate if value actually changed
     if (target === prevTarget.current) return;
+    const from = prevTarget.current;
     prevTarget.current = target;
 
     animValue.setValue(0);
     const listener = animValue.addListener(({ value }) => {
-      setDisplay(Math.round(value * target));
+      // Interpolate from previous value to new target
+      setDisplay(Math.round(from + value * (target - from)));
     });
 
     Animated.timing(animValue, {

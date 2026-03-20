@@ -5,7 +5,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { ThemeProvider, useTheme } from '../lib/theme';
 import { ToastProvider } from '../lib/toast';
-import { initDatabase } from '../lib/database';
+import { initDatabase } from '../lib/storage/database';
 import { configureNotificationHandler } from '../lib/notifications';
 
 function RootLayoutContent() {

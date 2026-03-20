@@ -2,9 +2,9 @@
 import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import * as DocumentPicker from 'expo-document-picker';
-import { getAllDeals, getAllBrands, getAllInvoices, getAllMessages, getDatabase } from './storage/database';
+import { getAllDeals, getAllBrands, getAllInvoices, getAllMessages, getAllBrandNotes, getDatabase } from './storage/database';
 
-const BACKUP_VERSION = 1;
+const BACKUP_VERSION = 2;
 
 export interface BackupData {
   version: number;
@@ -14,6 +14,7 @@ export interface BackupData {
     brands: any[];
     invoices: any[];
     messages: any[];
+    brandNotes?: any[];
   };
 }
 
@@ -25,6 +26,7 @@ export async function exportData(): Promise<boolean> {
     const brands = await getAllBrands();
     const invoices = await getAllInvoices();
     const messages = await getAllMessages();
+    const brandNotes = await getAllBrandNotes();
 
     const backup: BackupData = {
       version: BACKUP_VERSION,
@@ -34,6 +36,7 @@ export async function exportData(): Promise<boolean> {
         brands,
         invoices,
         messages,
+        brandNotes,
       },
     };
 
@@ -100,6 +103,7 @@ export async function importData(): Promise<{ success: boolean; message: string 
     // Import data (within transaction)
     await db.withTransactionAsync(async () => {
       // Clear existing data
+      await db.runAsync('DELETE FROM brand_notes');
       await db.runAsync('DELETE FROM deals');
       await db.runAsync('DELETE FROM brands');
       await db.runAsync('DELETE FROM invoices');
@@ -108,9 +112,9 @@ export async function importData(): Promise<{ success: boolean; message: string 
       // Import deals
       for (const deal of backup.data.deals) {
         await db.runAsync(
-          `INSERT INTO deals (id, title, brand_name, value, stage, description, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [deal.id, deal.title, deal.brandName, deal.value, deal.stage, deal.description, deal.createdAt, deal.updatedAt]
+          `INSERT INTO deals (id, title, brand_id, brand_name, value, stage, description, deliverables, due_date, created_at, updated_at, sync_status)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [deal.id, deal.title, deal.brandId ?? null, deal.brandName, deal.value ?? 0, deal.stage, deal.description ?? null, deal.deliverables ?? null, deal.dueDate ?? null, deal.createdAt, deal.updatedAt, deal.syncStatus ?? 'synced']
         );
       }
 
@@ -126,19 +130,30 @@ export async function importData(): Promise<{ success: boolean; message: string 
       // Import invoices
       for (const invoice of backup.data.invoices) {
         await db.runAsync(
-          `INSERT INTO invoices (id, brand_name, amount, status, due_date, paid_date, description, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-          [invoice.id, invoice.brandName, invoice.amount, invoice.status, invoice.dueDate, invoice.paidDate, invoice.description, invoice.createdAt, invoice.updatedAt]
+          `INSERT INTO invoices (id, deal_id, brand_id, brand_name, amount, status, due_date, paid_date, paid_amount, description, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [invoice.id, invoice.dealId ?? null, invoice.brandId ?? null, invoice.brandName, invoice.amount, invoice.status, invoice.dueDate ?? null, invoice.paidDate ?? null, invoice.paidAmount ?? 0, invoice.description ?? null, invoice.createdAt, invoice.updatedAt]
         );
       }
 
       // Import messages
       for (const msg of backup.data.messages) {
         await db.runAsync(
-          `INSERT INTO messages (id, type, content, is_completed, brand_name, deal_id, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-          [msg.id, msg.type, msg.content, msg.isCompleted ? 1 : 0, msg.brandName, msg.dealId, msg.createdAt, msg.updatedAt]
+          `INSERT INTO messages (id, deal_id, brand_name, content, type, is_completed, reminder_date, notification_id, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [msg.id, msg.dealId ?? null, msg.brandName ?? null, msg.content, msg.type, msg.isCompleted ? 1 : 0, msg.reminderDate ?? null, msg.notificationId ?? null, msg.createdAt, msg.updatedAt]
         );
+      }
+
+      // Import brand notes (if present in backup)
+      if (backup.data.brandNotes) {
+        for (const note of backup.data.brandNotes) {
+          await db.runAsync(
+            `INSERT INTO brand_notes (id, brand_id, content, created_at)
+             VALUES (?, ?, ?, ?)`,
+            [note.id, note.brandId, note.content, note.createdAt]
+          );
+        }
       }
     });
 
@@ -146,7 +161,8 @@ export async function importData(): Promise<{ success: boolean; message: string 
       backup.data.deals.length + 
       backup.data.brands.length + 
       backup.data.invoices.length + 
-      backup.data.messages.length;
+      backup.data.messages.length +
+      (backup.data.brandNotes?.length ?? 0);
 
     return { 
       success: true, 
@@ -168,6 +184,7 @@ export async function clearAllData(): Promise<boolean> {
     const db = getDatabase();
     
     await db.withTransactionAsync(async () => {
+      await db.runAsync('DELETE FROM brand_notes');
       await db.runAsync('DELETE FROM deals');
       await db.runAsync('DELETE FROM brands');
       await db.runAsync('DELETE FROM invoices');

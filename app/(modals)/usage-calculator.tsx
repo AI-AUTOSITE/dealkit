@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { useTheme, spacing, fontSize, borderRadius, shadows } from '../../lib/theme';
-import { getDatabase, generateId, getLocalDateString } from '../../lib/database';
+import { getDatabase, generateId, getLocalDateString } from '../../lib/storage/database';
 import { formatCurrency } from '../../lib/utils';
 
 interface UsageOption {

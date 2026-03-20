@@ -22,7 +22,7 @@ import {
 } from '@/lib/notifications';
 import { useDeals, useInvoices } from '@/lib/hooks';
 import { Ionicons } from '@expo/vector-icons';
-import { getDatabase } from '@/lib/database';
+import { getDatabase } from '@/lib/storage/database';
 import { UserProfile } from '@/types';
 
 // App version

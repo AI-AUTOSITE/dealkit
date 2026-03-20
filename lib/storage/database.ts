@@ -118,6 +118,96 @@ async function ensureDatabase(): Promise<SQLite.SQLiteDatabase> {
       `);
       await db.execAsync('CREATE INDEX IF NOT EXISTS idx_brand_notes_brand_id ON brand_notes(brand_id)');
 
+      // Create user_profile table
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS user_profile (
+          id INTEGER PRIMARY KEY DEFAULT 1,
+          display_name TEXT,
+          primary_platform TEXT,
+          handle TEXT,
+          followers INTEGER,
+          engagement_rate REAL,
+          niche TEXT,
+          email TEXT,
+          default_currency TEXT DEFAULT 'USD',
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+          updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Create usage_calculations table (Usage Calculator tool)
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS usage_calculations (
+          id TEXT PRIMARY KEY,
+          deal_id TEXT,
+          base_rate REAL NOT NULL,
+          content_type TEXT,
+          digital_usage TEXT,
+          traditional_usage TEXT,
+          duration TEXT NOT NULL,
+          exclusivity TEXT,
+          exclusivity_scope TEXT,
+          territory TEXT,
+          usage_types TEXT,
+          total_fee REAL,
+          calculated_fee_min REAL,
+          calculated_fee_max REAL,
+          breakdown TEXT,
+          contract_language TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Create contract_reviews table (Contract Review tool)
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS contract_reviews (
+          id TEXT PRIMARY KEY,
+          deal_id TEXT,
+          contract_text TEXT NOT NULL,
+          brand_name TEXT,
+          risk_score INTEGER,
+          critical_issues TEXT,
+          warnings TEXT,
+          positive_terms TEXT,
+          negotiation_tips TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Create rate_calculations table (Rate Calculator tool)
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS rate_calculations (
+          id TEXT PRIMARY KEY,
+          deal_id TEXT,
+          platform TEXT NOT NULL,
+          content_type TEXT NOT NULL,
+          followers INTEGER NOT NULL,
+          engagement_rate REAL,
+          niche TEXT,
+          usage_rights TEXT,
+          duration TEXT,
+          exclusivity TEXT,
+          whitelisting INTEGER DEFAULT 0,
+          calculated_rate_min REAL NOT NULL,
+          calculated_rate_max REAL NOT NULL,
+          breakdown TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
+      // Create email_drafts table (Email Assistant tool)
+      await db.execAsync(`
+        CREATE TABLE IF NOT EXISTS email_drafts (
+          id TEXT PRIMARY KEY,
+          deal_id TEXT,
+          template_type TEXT NOT NULL,
+          subject TEXT NOT NULL,
+          body TEXT NOT NULL,
+          input_data TEXT,
+          created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )
+      `);
+
       isInitialized = true;
       console.log('Database initialized successfully');
     } catch (error) {
@@ -127,9 +217,12 @@ async function ensureDatabase(): Promise<SQLite.SQLiteDatabase> {
     }
   })();
 
-  await initPromise;
-  initPromise = null;
-  return db!;
+  try {
+    await initPromise;
+    return db!;
+  } finally {
+    initPromise = null;
+  }
 }
 
 export function getDatabase(): SQLite.SQLiteDatabase {
@@ -139,15 +232,28 @@ export function getDatabase(): SQLite.SQLiteDatabase {
   return db;
 }
 
+// Explicit init for app startup (calls ensureDatabase internally)
+export async function initDatabase(): Promise<void> {
+  await ensureDatabase();
+}
+
 
 // Generate unique ID
-function generateId(): string {
+export function generateId(): string {
   return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 }
 
 // Get current timestamp
 function getTimestamp(): string {
   return new Date().toISOString();
+}
+
+// Get local date string (respecting timezone)
+export function getLocalDateString(date: Date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 // ============ DEALS ============
@@ -789,7 +895,8 @@ export async function updateMessage(id: string, updates: Partial<Message>): Prom
   
   await database.runAsync(
     `UPDATE messages SET
-      deal_id = ?, brand_name = ?, content = ?, type = ?, is_completed = ?, updated_at = ?
+      deal_id = ?, brand_name = ?, content = ?, type = ?, is_completed = ?,
+      reminder_date = ?, notification_id = ?, updated_at = ?
     WHERE id = ?`,
     [
       updated.dealId ?? null,
@@ -797,6 +904,8 @@ export async function updateMessage(id: string, updates: Partial<Message>): Prom
       updated.content,
       updated.type,
       updated.isCompleted ? 1 : 0,
+      updated.reminderDate ?? null,
+      updated.notificationId ?? null,
       updated.updatedAt,
       id,
     ]
@@ -836,6 +945,19 @@ export async function getBrandNotes(brandId: string): Promise<BrandNote[]> {
   const rows = await database.getAllAsync<any>(
     'SELECT * FROM brand_notes WHERE brand_id = ? ORDER BY created_at DESC',
     [brandId]
+  );
+  return rows.map(row => ({
+    id: row.id,
+    brandId: row.brand_id,
+    content: row.content,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function getAllBrandNotes(): Promise<BrandNote[]> {
+  const database = await ensureDatabase();
+  const rows = await database.getAllAsync<any>(
+    'SELECT * FROM brand_notes ORDER BY created_at DESC'
   );
   return rows.map(row => ({
     id: row.id,
